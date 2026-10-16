@@ -4,6 +4,8 @@ Phase 6 provides release engineering and automated verification. This candidate 
 not labelled a signed, DAW-certified production release. `RELEASE-REPORT.json`
 records automated gates and leaves the signing/manual-DAW gates open.
 
+[Windows installer + portable](https://github.com/treezysosa/G-Boy/actions/runs/38939414968/artifacts/12063271221) · [macOS universal PKG + portable](https://github.com/treezysosa/G-Boy/actions/runs/38939414968/artifacts/12062369174). All eleven native suites, both pluginval strictness-5 runs, installed macOS auval and installer smoke checks passed in the [validated workflow](https://github.com/treezysosa/G-Boy/actions/runs/38939414968).
+
 ## Installing and removing
 
 Windows x64: run `G-Boy-0.6.0-rc.1-Windows-Setup.exe`. It installs the standalone in
@@ -77,7 +79,7 @@ channel state; bypassed voice filters skip coefficient computation.
 ## Rebuilding the accompanying source
 
 Extract Source.tar.gz. It contains G-Boy and the complete JUCE 8.0.6 source used by
-the build, without Git history or generated audio/binaries. Build with CMake 3.22+
+the build, without Git history or generated audio/binaries. Packaging utilities require Python 3.9 or newer. Build with CMake 3.22+
 and a C++20 compiler:
 
 ```sh

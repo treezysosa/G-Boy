@@ -75,11 +75,36 @@ Built source commit: `48c9a6c7cfa27c0d784a821a4864eae4aad4861d`.
 
 The browser/index workflow is separate from the audio callback. Native GUI interaction, DAW compatibility, filesystem races under rapid edits, cross-process index coordination, real-world analysis quality, long-library CPU budgets, whole-callback realtime guarantees, signing and installers remain unverified. See [Phase 5](PHASE5.md) for precise storage, manifest, workflow and feature limits.
 
+## Phase 6 release-candidate verification
+
+[GitHub run 38939414968](https://github.com/treezysosa/G-Boy/actions/runs/38939414968) passed on Windows x64 and macOS. Built source commit: `2d4f526d8e7696a1b234e017dbd7c91523544473`.
+
+- **11/11 CTest suites passed on each native platform**, including packaging tools and release reliability. All previous audio, effects, vocal, sequencer, library and processor regressions pass.
+- Historical state fixtures v1–v5 migrate to v6; future versions, malformed/random state and non-finite parameter values are handled. Finite values clamp to parameter ranges. Numeric imported-library metadata is bounded before conversion/display.
+- C++ allocation/deallocation instrumentation reports zero operations inside the tested full processBlock paths across 44.1, 48, 96 and 192 kHz and blocks 1, 32, 256 and 1024. Concurrent loading/publication and parameter edits remain finite with zero tracked C++ callback allocations. This does not measure C malloc/free, operating-system locks or all host wrapper paths.
+- Ten real GUI snapshots cover five pages at 960x900 and 1600x1200. Images are included in validation evidence; physical DPI, accessibility and DAW embedding still need manual review.
+- Core benchmark reports measure 48 voices, three layers and two master effects across four sample rates and three block sizes. Local GCC runs measured approximately 8–37% median buffer budget on that workspace. Native runner measurements and processor CPU/peak values are included in the packages; none establish a universal hardware performance guarantee.
+- **Tracktion pluginval 1.0.4 strictness 5 passed on both VST3 builds.** The macOS validator is a universal arm64/x86_64 executable; its file identification and archive SHA-256 are recorded. Native tests execute on the runner architecture, not physical Intel hardware.
+- The macOS app, VST3 and AU include verified arm64 and x86_64 slices. The universal PKG built and installed successfully; **Apple auval passed on the installed AU** after refreshing Audio Component Registrar discovery.
+- The Windows EXE installer built, installed and uninstalled successfully. A user-profile marker survived uninstall. The MSVC runtime is statically linked. Installer actions were exercised only on disposable GitHub runners.
+- The Linux core job passed all eight suites under ASan/UBSan with leak detection enabled. Native GUI/JUCE code has not been ThreadSanitizer-certified.
+- Content generation/export produced twelve original WAV samples and fourteen real `.gboy` presets with three-second previews. The installable factory pack has 26 manifest entries, all with license/provenance metadata.
+- Final package gates passed. Installers and portable archives include documentation, full corresponding G Boy/JUCE source, dependency notices, validation reports and SHA-256 inventories. The temporary AU diagnostic job was removed after verification; cache failures cannot waive quality gates.
+
+Downloads:
+
+- [Windows installer + portable archive](https://github.com/treezysosa/G-Boy/actions/runs/38939414968/artifacts/12063271221)
+- [macOS universal PKG + portable archive](https://github.com/treezysosa/G-Boy/actions/runs/38939414968/artifacts/12062369174)
+- [Windows validation evidence](https://github.com/treezysosa/G-Boy/actions/runs/38939414968/artifacts/12062094074)
+- [macOS validation evidence](https://github.com/treezysosa/G-Boy/actions/runs/38939414968/artifacts/12063221342)
+
+The reports explicitly retain `signed: false`, `manual_daw_gate: open` and `public_stable_release: false`. No signing identities or actual DAW/device access were available. This completes the automated release-candidate engineering; it does not certify a signed production release. See [RELEASE.md](RELEASE.md) for installation, source rebuilds, owner-certificate signing/notarization and [DAW-MATRIX.csv](DAW-MATRIX.csv) for local sign-off.
+
 ## Remaining checks and development
 
-1. Run pluginval and interactive DAW tests: notes on multiple channels, import and automation during playback, rapid sample changes, project recall and offline export.
+1. Complete interactive DAW tests (automated pluginval and auval now pass): notes on multiple channels, import and automation during playback, rapid sample changes, project recall and offline export.
 2. Measure full callback CPU, allocations and locks under hosts; run ThreadSanitizer on publication/loader teardown and keyboard events. Core allocation tests do not establish whole-plugin realtime guarantees.
 3. Add sample-change crossfades, smooth generator/filter/enable changes and envelope-time edits, and listen under extreme automation. FM is not oversampled and can alias at high notes/indices.
 4. Add root-note controls, sustain pedal, looping and key zones; validate sample relocation and missing-file recovery workflows.
-5. Review the GUI at multiple DPI settings and window sizes, test devices and accessibility, and prepare signed installers after validation.
-6. Phase 6 focuses on plugin validation, performance/DAW tests, installers, signing and release packaging. Phase 3 vocal processing remains offline and needs listening/DAW tests on actual licensed recordings.
+5. Review physical DPI, devices and accessibility. Automated page/size snapshots and unsigned installers now pass; apply owner signatures/notarization after manual release sign-off.
+6. The Phase 6 candidate is packaged and automatically validated. Finish the owner-certificate and manual DAW gates before a stable public release. Vocal processing remains offline and needs listening tests on actual licensed recordings.

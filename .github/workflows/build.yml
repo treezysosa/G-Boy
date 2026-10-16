@@ -7,19 +7,6 @@ concurrency:
   group: gboy-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  diagnose-au:
-    if: startsWith(github.event.head_commit.message, 'Diagnose')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          github-token: ${{ github.token }}
-          repository: treezysosa/G-Boy
-          run-id: 38937886152
-          name: G-Boy-validation-macOS
-          path: evidence
-      - name: Show prior AU diagnostic
-        run: cat evidence/auval.log
   sanitizers:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -44,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Restore native build cache
+        continue-on-error: true
         id: native-cache
         uses: actions/cache/restore@v4
         with:
@@ -59,6 +47,7 @@ jobs:
       - name: Compile
         run: cmake --build build --config Release --parallel 4
       - name: Save compiled build cache
+        continue-on-error: true
         if: steps.native-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
