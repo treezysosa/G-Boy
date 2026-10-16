@@ -5,11 +5,12 @@
 #include "vocals/VocalRenderer.h"
 #include "sequencer/Sequencer.h"
 #include "sequencer/ParameterSpecs.h"
+#include "library/LibraryManager.h"
 #include <thread>
 #include <mutex>
 class GBoyProcessor final : public juce::AudioProcessor, private juce::MidiKeyboardStateListener {
 public:
- GBoyProcessor(); ~GBoyProcessor() override;
+ explicit GBoyProcessor(juce::File libraryHome=gboy::library::LibraryManager::defaultHome()); ~GBoyProcessor() override;
  void prepareToPlay(double,int) override;
  void releaseResources() override {}
  void processBlock(juce::AudioBuffer<float>&,juce::MidiBuffer&) override;
@@ -36,7 +37,13 @@ public:
  std::atomic<bool> hostSyncActive{false};
  void loadVocalPreset(int);
  void loadHybridPreset(int preset);
- void requestSample(juce::String source,int layer=0);
+ void requestSample(juce::String source,int layer=0,int root=60,juce::String assetId={});
+ std::shared_ptr<gboy::library::LibraryManager> libraryOwner;
+ gboy::library::LibraryManager& library;
+ bool loadLibraryEntry(const juce::String& id,int layer);
+ void previewLibraryEntry(const juce::String& id);void stopLibraryPreview();
+ bool saveLibraryPatch(juce::File);
+ std::atomic<bool> previewBusy{false};
  juce::String status(int layer=0);
  juce::AudioProcessorValueTreeState state;
  juce::MidiKeyboardState keyboard;
@@ -46,9 +53,14 @@ public:
 private:
  static juce::AudioProcessorValueTreeState::ParameterLayout layout();
  gboy::HybridEngine engine;
+ gboy::Engine previewEngine;gboy::Sample* previewActive=nullptr;
+ std::atomic<gboy::Sample*> previewPending{nullptr},previewRetired{nullptr};
+ std::atomic<bool> previewStop{false};juce::String previewRequest;uint64_t previewGeneration=0;
+ void buildPreview(const juce::String&,uint64_t);void mixPreview(juce::AudioBuffer<float>&);
  struct SampleSlot {
   gboy::Sample* active=nullptr;
   std::atomic<gboy::Sample*> pending{nullptr},retired{nullptr};
+  int requestedRoot=60,publishedRoot=60;juce::String requestedAsset,originalAsset,asset;
   juce::String requested,source="factory:0",message="CHIP PULSE",originalSource="factory:0";bool hasRequest=false,rendering=false,sourceDirty=false;
   std::unique_ptr<gboy::Sample> original;gboy::vocal::Settings applied;SliceInfo info;
  };

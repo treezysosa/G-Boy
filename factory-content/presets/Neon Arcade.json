@@ -1,0 +1,14 @@
+{
+  "name": "Neon Arcade",
+  "category": "CHIPTUNE",
+  "author": "G Boy Audio",
+  "license": "CC0-1.0",
+  "provenance": "Original two-layer procedural render: src/presets/FactoryPatches.h hybrid(7)",
+  "human_performance": false,
+  "factory_function": "GBoyProcessor::loadHybridPreset",
+  "factory_index": 7,
+  "macros": {
+    "Layer Macro": "Oscillator shape / FM index"
+  },
+  "note": "Factory patch available in Browser and Hybrid menus. This JSON describes content; it is not a native .gboy file."
+}

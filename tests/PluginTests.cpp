@@ -11,7 +11,7 @@ void settle(GBoyProcessor& p){
 }
 int runTests(){
  juce::ScopedJuceInitialiser_GUI gui;
- auto p=std::make_unique<GBoyProcessor>();p->prepareToPlay(48000,256);
+ juce::TemporaryFile libraryHome("-profile");auto p=std::make_unique<GBoyProcessor>(libraryHome.getFile());p->prepareToPlay(48000,256);
  for(int layer=0;layer<4;++layer){set(*p,gboy::parameterId(layer,"enabled"),1);set(*p,gboy::parameterId(layer,"generator"),float(layer+1));set(*p,gboy::parameterId(layer,"tune"),float(layer*3));}
  set(*p,gboy::routeId(2,0,"source"),4);set(*p,gboy::routeId(2,0,"target"),0);set(*p,gboy::routeId(2,0,"amount"),.7f);
  const float savedTune=p->state.getRawParameterValue(gboy::parameterId(2,"tune"))->load();
@@ -62,6 +62,7 @@ int runTests(){
  p->setStateInformation(legacy.getData(),int(legacy.getSize()));settle(*p);require(p->state.getRawParameterValue("seq_enabled")->load()==0&&p->state.getRawParameterValue(gboy::fx::parameterId(4,0,"type"))->load()==0,"legacy state disables sequencer and rack");
  p->setStateInformation("invalid",7);p->setStateInformation(nullptr,0);
  std::cout<<"PASS processor: layer/matrix recall, sample-offset MIDI, wheel/bend, Phase 1 migration, missing sample, vocal render/recall, MIDI export, vocal presets, rack persistence, sequencer audio/export/recall/host sync\n";
+ p.reset();libraryHome.getFile().deleteRecursively();
  return 0;
 }
 int main(){try{return runTests();}catch(const std::exception& error){std::cerr<<"FAIL processor: "<<error.what()<<std::endl;return 1;}}

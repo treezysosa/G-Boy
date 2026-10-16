@@ -1,6 +1,7 @@
 #pragma once
 #include "PluginProcessor.h"
 #include "sequencer/StepGrid.h"
+#include "library/BrowserComponent.h"
 class GBoyEditor final:public juce::AudioProcessorEditor,private juce::Timer,public juce::FileDragAndDropTarget {
 public:
  explicit GBoyEditor(GBoyProcessor&);
@@ -24,7 +25,8 @@ private:
  std::unique_ptr<ComboAttachment> sliceAttachment,effectAttachment;
  juce::TextButton synthetic{"SYNTHETIC VOWEL SOURCE"},midiExport{"EXPORT SLICE MIDI"},hybridPage{"HYBRID"},vocalPage{"VOCALS"};
  bool showVocals=false;int page=0;void setPage(int);
- juce::TextButton effectsPage{"FX"},sequencePage{"SEQ"};
+ juce::TextButton effectsPage{"FX"},sequencePage{"SEQ"},browserPage{"BROWSER"};
+ std::unique_ptr<LibraryBrowser> browser;
  juce::ToggleButton masterRack{"Master rack"};juce::ComboBox rackPresets;
  juce::TextButton rackSave{"SAVE RACK"},rackLoad{"LOAD RACK"};
  std::array<juce::ComboBox,4> effectTypes;

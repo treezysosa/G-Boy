@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "samples": [
     {
       "name": "Chip Pulse",
@@ -59,6 +59,66 @@
       "license": "CC0-1.0",
       "sample_rate": 48000,
       "category": "IMPULSE RESPONSE"
+    },
+    {
+      "name": "Quiet Storm Keys",
+      "file": "samples/Quiet Storm Keys.wav",
+      "source": "Original two-layer procedural render: src/presets/FactoryPatches.h hybrid(4)",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "root_midi": 60,
+      "sample_rate": 48000,
+      "category": "SOUL"
+    },
+    {
+      "name": "Velvet Night Pad",
+      "file": "samples/Velvet Night Pad.wav",
+      "source": "Original two-layer procedural render: src/presets/FactoryPatches.h hybrid(5)",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "root_midi": 60,
+      "sample_rate": 48000,
+      "category": "R&B"
+    },
+    {
+      "name": "Cassette Bass",
+      "file": "samples/Cassette Bass.wav",
+      "source": "Original two-layer procedural render: src/presets/FactoryPatches.h hybrid(6)",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "root_midi": 60,
+      "sample_rate": 48000,
+      "category": "BASS"
+    },
+    {
+      "name": "Neon Arcade",
+      "file": "samples/Neon Arcade.wav",
+      "source": "Original two-layer procedural render: src/presets/FactoryPatches.h hybrid(7)",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "root_midi": 60,
+      "sample_rate": 48000,
+      "category": "CHIPTUNE"
+    },
+    {
+      "name": "Haunted Glass",
+      "file": "samples/Haunted Glass.wav",
+      "source": "Original two-layer procedural render: src/presets/FactoryPatches.h hybrid(8)",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "root_midi": 60,
+      "sample_rate": 48000,
+      "category": "HORROR"
+    },
+    {
+      "name": "Bedroom Haze",
+      "file": "samples/Bedroom Haze.wav",
+      "source": "Original two-layer procedural render: src/presets/FactoryPatches.h hybrid(9)",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "root_midi": 60,
+      "sample_rate": 48000,
+      "category": "INDIE"
     }
   ],
   "renders": [
