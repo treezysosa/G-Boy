@@ -23,8 +23,8 @@ GBoyEditor::GBoyEditor(GBoyProcessor& processor):AudioProcessorEditor(processor)
  sliceMode.addItemList({"Whole phrase (chromatic)","8 grid slices / MIDI 60-67","16 grid slices / MIDI 60-75","Detect onsets / MIDI 60+"},1);
  vocalEffect.addItemList({"Clean","Telephone","Lo-fi resampling","Stutter / fixed 120 BPM"},1);
  sliceLabel.setText("SLICE MAPPING",juce::dontSendNotification);effectLabel.setText("VOCAL EFFECT",juce::dontSendNotification);
- vocalHelp.setText("Import your original recording or use the synthetic vowel source.
-Choose the Vocal engine for MIDI slice playback. Edits render in the background.",juce::dontSendNotification);vocalHelp.setJustificationType(juce::Justification::centredLeft);
+ vocalHelp.setText("Import your original recording or use the synthetic vowel source.\n"
+                   "Choose the Vocal engine for MIDI slice playback. Edits render in the background.",juce::dontSendNotification);vocalHelp.setJustificationType(juce::Justification::centredLeft);
  vocalPatches.addItemList({"Pixel Chops","Reverse Aura","Radio Cuts","Vowel Harmony"},1);vocalPatches.setTextWhenNothingSelected("Vocal presets...");vocalPatches.onChange=[this]{if(vocalPatches.getSelectedId()>0){p.loadVocalPreset(vocalPatches.getSelectedId()-1);vocalPatches.setSelectedId(0,juce::dontSendNotification);}};
  hybridPage.onClick=[this]{setPage(false);};vocalPage.onClick=[this]{setPage(true);};synthetic.onClick=[this]{p.requestSample("vocal:0",selectedLayer);};midiExport.onClick=[this]{choose(3);};
  addAndMakeVisible(keys);keys.setAvailableRange(36,96);keys.setKeyWidth(22);selectLayer(0);setPage(false);setResizable(true,true);setResizeLimits(960,900,1600,1200);setSize(1080,940);startTimerHz(30);
