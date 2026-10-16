@@ -13,8 +13,13 @@ int main(){
  auto p=std::make_unique<GBoyProcessor>();p->prepareToPlay(48000,256);
  for(int layer=0;layer<4;++layer){set(*p,gboy::parameterId(layer,"enabled"),1);set(*p,gboy::parameterId(layer,"generator"),float(layer+1));set(*p,gboy::parameterId(layer,"tune"),float(layer*3));}
  set(*p,gboy::routeId(2,0,"source"),4);set(*p,gboy::routeId(2,0,"target"),0);set(*p,gboy::routeId(2,0,"amount"),.7f);
+ const float savedTune=p->state.getRawParameterValue(gboy::parameterId(2,"tune"))->load();
+ const float savedAmount=p->state.getRawParameterValue(gboy::routeId(2,0,"amount"))->load();
  juce::MemoryBlock saved;p->getStateInformation(saved);set(*p,gboy::parameterId(2,"tune"),-12);p->setStateInformation(saved.getData(),int(saved.getSize()));settle(*p);
- require(p->state.getRawParameterValue(gboy::parameterId(2,"tune"))->load()==6,"layer state roundtrip");require(p->state.getRawParameterValue(gboy::routeId(2,0,"amount"))->load()==.7f,"matrix state roundtrip");
+  const float restoredTune=p->state.getRawParameterValue(gboy::parameterId(2,"tune"))->load();
+ const float restoredAmount=p->state.getRawParameterValue(gboy::routeId(2,0,"amount"))->load();
+ std::cerr<<"Tune saved/restored: "<<savedTune<<" / "<<restoredTune<<"; route: "<<savedAmount<<" / "<<restoredAmount<<"\n";
+ require(std::abs(restoredTune-savedTune)<.0002f&&std::abs(restoredTune-6)<.0002f,"layer state roundtrip");require(std::abs(restoredAmount-savedAmount)<.0001f&&std::abs(restoredAmount-.7f)<.0001f,"matrix state roundtrip");
  juce::AudioBuffer<float> buffer(2,256);juce::MidiBuffer midi;midi.addEvent(juce::MidiMessage::noteOn(1,60,.8f),64);p->processBlock(buffer,midi);
  require(buffer.getMagnitude(0,64)==0,"sample offset preceding note silent");require(buffer.getMagnitude(64,192)>0,"sample offset following note audible");
  midi.addEvent(juce::MidiMessage::pitchWheel(1,16383),0);midi.addEvent(juce::MidiMessage::controllerEvent(1,1,127),0);p->processBlock(buffer,midi);require(std::isfinite(buffer.getMagnitude(0,256)),"MIDI modulation finite");

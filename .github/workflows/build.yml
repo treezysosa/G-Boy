@@ -2,7 +2,9 @@ name: Build and test
 on: [push, pull_request, workflow_dispatch]
 jobs:
   plugin:
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -11,8 +13,8 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Compile
-        run: cmake --build build --config Release --parallel 2
-      - name: Core tests
+        run: cmake --build build --config Release --parallel 4
+      - name: Tests
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Generate factory audio
         shell: bash
