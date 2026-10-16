@@ -1,6 +1,7 @@
 #include "audio/Engine.h"
 #include "audio/HybridEngine.h"
 #include "vocals/VocalRenderer.h"
+#include "sequencer/Sequencer.h"
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -23,5 +24,13 @@ int main(int argc,char** argv){auto dest=std::filesystem::path(argc>1?argv[1]:"f
  auto phrase=gboy::vocal::syntheticPhrase();wav(dest/"Synthetic Vowel Phrase.wav",phrase.left,phrase.right,44100);
  gboy::vocal::Settings vocal;vocal.pitch=4;vocal.stretch=1.25f;vocal.formant=-2;vocal.slicing=1;vocal.effect=1;
  auto processed=gboy::vocal::render(phrase,vocal);wav(dest/"../Phase3-Demo.wav",processed.left,processed.right,44100);
+
+ gboy::HybridEngine arrangement;arrangement.prepare(48000);arrangement.layers[0].params.generator=gboy::Generator::Analog;arrangement.layers[0].params.shape=.35f;arrangement.layers[0].params.filter=1;arrangement.layers[0].params.cutoff=4500;arrangement.layers[1].params.enabled=true;arrangement.layers[1].params.generator=gboy::Generator::FM;arrangement.layers[1].params.level=.25f;
+ arrangement.masterEffects.slots[0].params={gboy::fx::Type::PingPong,false,.25f,.6f,.5f,.8f};arrangement.masterEffects.slots[1].params={gboy::fx::Type::Reverb,false,.2f,.7f,.5f,.7f};
+ gboy::seq::Sequencer pattern;gboy::seq::Settings patternSettings;patternSettings.enabled=true;patternSettings.root=48;patternSettings.scale=1;pattern.configure(patternSettings);
+ l.assign(48000*6,0);r.assign(l.size(),0);int cursor=0;
+ for(int frame=0;frame<48000*4;++frame){const auto events=pattern.tick(double(frame)/24000,true);if(events.count){arrangement.render(l.data()+cursor,r.data()+cursor,frame-cursor);for(int i=0;i<events.count;++i){const auto& event=events.values[size_t(i)];if(event.on)arrangement.noteOn(event.note,event.velocity,event.channel);else arrangement.noteOff(event.note,event.channel);}cursor=frame;}}
+ arrangement.render(l.data()+cursor,r.data()+cursor,48000*4-cursor);const auto stopEvents=pattern.tick(8,false);for(int i=0;i<stopEvents.count;++i)arrangement.noteOff(stopEvents.values[size_t(i)].note,stopEvents.values[size_t(i)].channel);arrangement.render(l.data()+48000*4,r.data()+48000*4,48000*2);wav(dest/"../Phase4-Demo.wav",l,r,48000);
+ gboy::fx::Slot room;room.params={gboy::fx::Type::Convolution,false,1,.6f,.6f,.8f};room.prepare(48000);l.assign(24000,0);r.assign(24000,0);room.process(l.data(),r.data(),24000);l[0]=r[0]=1;room.process(l.data(),r.data(),24000);wav(dest/"Factory Sparse Room IR.wav",l,r,48000);
 
 }

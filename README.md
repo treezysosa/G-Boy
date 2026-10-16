@@ -1,9 +1,31 @@
-# G Boy — Phase 3 (0.3.0)
+# G Boy — Phase 4 (0.4.0)
 
 A C++20 sample instrument with a JUCE 8 interface. Source foundation, not a validated production release. Windows VST3/Standalone and macOS VST3/AU/Standalone targets are configured. Phase 1 compiled and passed its tests on GitHub Windows and macOS runners. Phase 2 hybrid builds also passed on both runners. Phase 3 also built successfully on Windows and macOS, with all five test suites passing on each. See docs/VALIDATION.md for download links and the scope of validation.
 
 Implemented: 64-voice stereo sampler, linear interpolation, MIDI note-on/off and channel-aware release, oldest-voice stealing, ADSR, smoothed master gain, soft output limiting, four original generated sounds, on-screen keyboard, hold-to-preview A button, B panic, sample drag/drop and asynchronous decoding, factory selector, save/load `.gboy` presets and host project state, resizable handheld-style GUI, waveform and output meter, modern/retro palettes. Parameters are exposed to DAW automation. Imported samples use MIDI 60 as root. WAV/AIFF/FLAC support comes from JUCE's basic format readers.
 
+
+## Phase 4 effects and sequencer
+
+**FX:** edit the selected layer's four serial slots, or select **Master rack**. Choose any of 26 effect types, adjust wet/dry and the three labelled physical-unit controls, bypass a slot, and use UP/DN to change order. SAVE RACK / LOAD RACK writes `.gbfx` files; full `.gboy` presets include every rack and modulation route. Six rack settings include Init, Tape Dream, Crushed Cassette, Shimmer Cloud, Pump Delay and Factory Room.
+
+Implemented effects: single-band parametric EQ, compressor, peak limiter, saturation, hard/fold distortion, bitcrusher, sample-rate reduction, tape/wow, vinyl hiss/crackles, chorus, flanger, four-stage phaser, tremolo, auto-pan, stereo delay, ping-pong delay, algorithmic reverb, sparse factory-IR convolution, shimmer reverb, filter sweep, comb resonator, ring modulation, transient shaper, mid/side width, beat-clock ducking and delay-head pitch/vibrato modulation. Controls smooth over approximately 10ms. Type/order changes reset slot state and are not fully click-free. Vinyl intentionally generates noise even with no notes. The limiter is not an oversampled true-peak limiter; nonlinear effects are not oversampled. Pitch modulation has creative wet-path delay rather than host-compensated retuning. Convolution uses a generated 64-tap sparse room FIR with adjustable spread/decay; imported long IRs and partitioned convolution are not implemented.
+
+**Modulation:** HYBRID's matrix now has an **FX override** selector per row: use the existing voice destination, or route to layer FX mix/primary amount or master FX mix/primary amount. Existing destination IDs/ranges remain unchanged for older automation. FX modulation is shared across slots in a rack, evaluated per render chunk (up to 256 samples) and smoothed. Envelope uses the largest active layer voice; velocity/note/wheel use that layer's most recent note/channel. Master modulation sums the layer routes. Rack files store slot settings; matrix routing belongs to the full patch.
+
+**SEQ:** enable the sequencer, then use **Host sync** with DAW play, or turn Host sync off and press **Run** for the internal clock. Standalone falls back to the internal clock if no host PPQ is available. Enabled sequencing replaces direct MIDI notes. Step mode uses the lowest held note as root, or Root MIDI when no notes are held. Arp modes require held/latched keys; Chord mode plays held keys (up to eight), or a root major triad. Incoming MIDI channels/velocities are retained. B / STOP disables sequencing and releases notes.
+
+- Four editable banks, each with 64 stored steps; active lengths 16/32/64, with eighth/sixteenth/thirty-second-note divisions.
+- 16-column piano-roll pages: click/drag to set/enable notes, right-click to disable, and edit the bottom velocity bars. The grid shows ±12 semitones; the selected-step pitch control supports ±24. Inactive steps beyond the current length are grey.
+- Per-step velocity, gate, probability and 1–4 ratchets; swing delays odd steps while preserving each pair's duration.
+- Up/down/up-down arps, 1–3 octaves, latch, chord mode, five scale choices and key locking (0=C, 1=C#, etc.).
+- Optional chaining cycles A→B→C→D from the selected bank; the bank menu selects the starting/edit bank. Playhead status shows the sounding bank and step.
+- Four original pattern presets and seeded randomization of the selected bank. Random probability repeats deterministically for the same seed and absolute beat position.
+- EXPORT PATTERN MIDI writes 960-PPQN MIDI with tempo, swing, gates, ratchets, probability, scale and chaining, using the playback scheduler. Export starts at beat zero; arp export uses a root major triad instead of live held input. Disable internal sequencing when playing the exported MIDI back into G Boy. File export is implemented; drag-export and realtime MIDI output are not.
+
+Host sync requires usable PPQ information. Transport stops/seeks release generated notes; effects can continue their tails. The plugin reports an estimated finite tail (capped at 600 seconds); continuous noise and externally held notes are not finite tails. No external sidechain bus, automatic CPU governor or performance guarantee at maximum FX/polyphony has been implemented. The rack and sequencer need interactive DAW and listening validation before release.
+
+`factory-content/Phase4-Demo.wav` is a real sequenced two-layer render with ping-pong delay and reverb. The factory sparse-room response is included with original provenance metadata. See [Phase 4](docs/PHASE4.md) for the module contract and [validation](docs/VALIDATION.md) for results.
 
 ## Phase 3 vocal workstation
 
@@ -14,7 +36,7 @@ Select **VOCALS** to edit the selected layer. IMPORT accepts your original or li
 - **Formant:** ±12 semitones of cepstral spectral-envelope movement. Preserve formants compensates for the *rendered pitch control*. It is approximate, with audible artifacts possible; it does not clone a voice.
 - **Reverse:** reverses the rendered phrase. Changes always start from the cached original, never from a previously processed result.
 - **Chops:** whole phrase, 8/16 equal slices, or energy-onset detection (up to 32). Slice markers and MIDI note numbers appear on the waveform; slices map from MIDI 60 upward and retain their base pitch. Layer tuning and bend can transpose them. Whole-phrase key tracking and layer tuning use conventional resampling, so live MIDI transposition still changes duration/formants; preservation applies to the offline pitch edit.
-- **Effects:** clean, telephone band filtering/saturation, lo-fi sample hold/quantization, and stutter at a fixed 120 BPM. These are rendered effects, not the future general-purpose FX rack.
+- **Effects:** clean, telephone band filtering/saturation, lo-fi sample hold/quantization, and stutter at a fixed 120 BPM. These are rendered effects, separate from the realtime FX rack.
 - **EXPORT SLICE MIDI:** writes a standard `.mid` sequence at 120 BPM using detected/rendered slice timing. Import the file into a DAW MIDI track routed to G Boy. Realtime MIDI output and drag-export are not implemented.
 
 Vocal controls are stored in plugin/preset state and exposed to the host. They debounce for 150ms and render on the worker, so they are **offline edits, not sample-accurate live automation**. Wait for RENDERING / LOADING to finish before playing or bouncing the new version. The previous buffer stays playable meanwhile. Publishing a render stops that layer's voices and can click. Imports are limited to 30 seconds at 8–192 kHz; stretching can double the buffer length. High-rate, four-layer patches can require hundreds of MB of memory; one worker bounds concurrent render work.
@@ -103,6 +125,6 @@ Presets store all four layers, their matrix routes, and absolute user sample pat
 
 ## Validation and scope
 
-See [validation](docs/VALIDATION.md) for actual test results and remaining checks. Later phases (full FX rack, sequencer, searchable libraries) are not implemented or displayed as working controls. MIDI 2.0, sustain pedal, looping, streaming, root detection, custom root selection, CLAP, AAX, GPU rendering, undo, MIDI learn, installers and release signing are not included. Pro Tools support needs AAX and its licensed SDK; VST3 does not provide native Pro Tools support.
+See [validation](docs/VALIDATION.md) for actual test results and remaining checks. Later phases (searchable libraries, installation, production validation) are not implemented or displayed as working controls. MIDI 2.0, sustain pedal, looping, streaming, root detection, custom root selection, CLAP, AAX, GPU rendering, undo, MIDI learn, installers and release signing are not included. Pro Tools support needs AAX and its licensed SDK; VST3 does not provide native Pro Tools support.
 
 Before distribution, review JUCE's AGPLv3/commercial licensing requirements. Repository source is MIT; generated factory content is CC0-1.0. No Nintendo assets, game recordings or human vocal recordings are included.

@@ -1,0 +1,9 @@
+{
+  "name": "Chord Pulse",
+  "category": "SEQUENCER",
+  "author": "G Boy Audio",
+  "license": "CC0-1.0",
+  "factory_function": "GBoyProcessor::loadSequencePreset",
+  "factory_index": 3,
+  "note": "Factory metadata. Use the named menu entry. Full plugin presets use .gboy; rack files use .gbfx."
+}

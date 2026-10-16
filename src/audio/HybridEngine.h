@@ -4,6 +4,7 @@
 #include "../granular/Grains.h"
 #include "../effects/StateVariableFilter.h"
 #include "../modulation/Matrix.h"
+#include "../effects/EffectRack.h"
 namespace gboy {
 enum class Generator { Sample,Analog,Wavetable,FM,Granular,Vocal };
 struct LayerParameters {
@@ -25,6 +26,7 @@ class LayerEngine {
  std::array<Voice,64> voices{};
  const Sample* sample=nullptr;const Wavetables* tables=nullptr;
  double rate=44100,lfoPhase=0;float smoothing=.03f,layerGain=0;uint64_t age=0;
+ float lastVelocity=0;int lastNote=60,lastChannel=1;
  Generator lastGenerator=Generator::Sample;
  std::array<float,16> wheels{},bends{};
  void control(Voice& v,float lfo){
@@ -46,7 +48,10 @@ class LayerEngine {
  }
 public:
  LayerParameters params;
- void prepare(double r,const Wavetables& wt){rate=r;tables=&wt;smoothing=float(1-std::exp(-16/(.005*rate)));reset();wheels={};bends={};}
+ fx::Rack effects;
+ std::array<float,4> effectModulation() const {float envelope=0;for(const auto& voice:voices)if(voice.stage)envelope=std::max(envelope,voice.env);const auto values=evaluate(params.routes,{0,float(std::sin(tau*lfoPhase)),envelope,lastVelocity,wheels[size_t(lastChannel-1)],float(lastNote-60)/60.f,params.macro});return {values[6],values[7],values[8],values[9]};}
+
+ void prepare(double r,const Wavetables& wt){rate=r;tables=&wt;effects.prepare(rate);smoothing=float(1-std::exp(-16/(.005*rate)));reset();wheels={};bends={};}
  void reset(){for(auto& v:voices)v={};lfoPhase=0;layerGain=0;lastGenerator=params.generator;}
  void setSample(const Sample* s){sample=s;reset();}
  void wheel(int channel,float value){if(channel>=1&&channel<=16)wheels[size_t(channel-1)]=std::clamp(value,0.f,1.f);}
@@ -57,6 +62,7 @@ public:
   if((params.generator==Generator::Sample||params.generator==Generator::Granular||params.generator==Generator::Vocal)&&(!sample||sample->left.size()<2||sample->left.size()!=sample->right.size()))return;
   if(params.generator==Generator::Vocal&&sample->sliceCount>0&&(note<60||note>=60+sample->sliceCount))return;
   if(lastGenerator!=params.generator){reset();}
+  lastVelocity=velocity;lastNote=note;lastChannel=channel;
   auto* selected=&voices[0];
   for(auto& v:voices){if(v.stage==0){selected=&v;break;}if(v.age<selected->age)selected=&v;}
   *selected={};auto& v=*selected;v.note=std::clamp(note,0,127);v.channel=channel;v.velocity=std::clamp(velocity,0.f,1.f);v.stage=1;v.age=++age;
@@ -114,13 +120,14 @@ public:
 class HybridEngine {
  // Tables precede layers and outlive all references to them.
  Wavetables tables;
- float gain=0,gainCoefficient=.002f;
+ float gain=0,gainCoefficient=.002f;double renderRate=44100;
  std::array<float,256> scratchL{},scratchR{};
 public:
  std::array<LayerEngine,4> layers;
- float volume=.65f;
+ float volume=.65f;fx::Rack masterEffects;double tempo=120,beat=0;
  HybridEngine(){for(size_t i=1;i<4;++i)layers[i].params.enabled=false;prepare(44100);}
- void prepare(double rate){gain=0;gainCoefficient=float(1-std::exp(-1/(.01*rate)));for(auto& layer:layers)layer.prepare(rate,tables);}
+ void prepare(double rate){renderRate=rate;masterEffects.prepare(rate);gain=0;gainCoefficient=float(1-std::exp(-1/(.01*rate)));for(auto& layer:layers)layer.prepare(rate,tables);}
+ void resetEffects(){masterEffects.reset();for(auto& layer:layers)layer.effects.reset();}
  void noteOn(int note,float velocity,int channel=1){for(auto& layer:layers)layer.noteOn(note,velocity,channel);}
  void noteOff(int note,int channel=1){for(auto& layer:layers)layer.noteOff(note,channel);}
  void allOff(int channel=0){for(auto& layer:layers)layer.allOff(channel);}
@@ -129,8 +136,12 @@ public:
  void render(float* l,float* r,int count){
   for(int offset=0;offset<count;offset+=256){const int n=std::min(256,count-offset);
    std::fill_n(l+offset,n,0.f);std::fill_n(r+offset,n,0.f);
-   for(auto& layer:layers){layer.render(scratchL.data(),scratchR.data(),n);for(int i=0;i<n;++i){l[offset+i]+=scratchL[size_t(i)];r[offset+i]+=scratchR[size_t(i)];}}
-   for(int i=0;i<n;++i){gain+=(volume-gain)*gainCoefficient;l[offset+i]=std::tanh(l[offset+i]*gain);r[offset+i]=std::tanh(r[offset+i]*gain);}
+   float masterMixMod=0,masterAmountMod=0;
+   for(auto& layer:layers){layer.render(scratchL.data(),scratchR.data(),n);const auto mod=layer.effectModulation();layer.effects.process(scratchL.data(),scratchR.data(),n,tempo,beat,mod[0],mod[1]);masterMixMod+=mod[2];masterAmountMod+=mod[3];for(int i=0;i<n;++i){l[offset+i]+=scratchL[size_t(i)];r[offset+i]+=scratchR[size_t(i)];}}
+   for(int i=0;i<n;++i){gain+=(volume-gain)*gainCoefficient;l[offset+i]*=gain;r[offset+i]*=gain;}
+   masterEffects.process(l+offset,r+offset,n,tempo,beat,std::clamp(masterMixMod,-1.f,1.f),std::clamp(masterAmountMod,-1.f,1.f));
+   for(int i=0;i<n;++i){l[offset+i]=std::tanh(l[offset+i]);r[offset+i]=std::tanh(r[offset+i]);}
+   beat+=double(n)*tempo/(60*renderRate);
   }
  }
 };

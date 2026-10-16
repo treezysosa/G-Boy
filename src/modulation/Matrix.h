@@ -3,7 +3,7 @@
 #include <algorithm>
 namespace gboy {
 enum class ModSource { Off,Lfo,Envelope,Velocity,Wheel,Note,Macro,Count };
-enum class ModTarget { Pitch,Cutoff,Gain,Pan,Position,Shape,Count };
+enum class ModTarget { Pitch,Cutoff,Gain,Pan,Position,Shape,FxMix,FxAmount,MasterFxMix,MasterFxAmount,Count };
 struct ModRoute { ModSource source=ModSource::Off; ModTarget target=ModTarget::Pitch; float amount=0; };
 using ModValues=std::array<float,size_t(ModTarget::Count)>;
 inline ModValues evaluate(const std::array<ModRoute,4>& routes,const std::array<float,size_t(ModSource::Count)>& sources){

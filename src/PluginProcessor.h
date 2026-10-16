@@ -3,6 +3,8 @@
 #include "audio/HybridEngine.h"
 #include "audio/ParameterSpecs.h"
 #include "vocals/VocalRenderer.h"
+#include "sequencer/Sequencer.h"
+#include "sequencer/ParameterSpecs.h"
 #include <thread>
 #include <mutex>
 class GBoyProcessor final : public juce::AudioProcessor, private juce::MidiKeyboardStateListener {
@@ -16,7 +18,7 @@ public:
  bool hasEditor() const override {return true;}
  const juce::String getName() const override {return "G Boy";}
  bool acceptsMidi() const override {return true;} bool producesMidi() const override {return false;}
- double getTailLengthSeconds() const override {return 10.;}
+ double getTailLengthSeconds() const override;
  int getNumPrograms() override {return 1;} int getCurrentProgram() override {return 0;}
  void setCurrentProgram(int) override {} const juce::String getProgramName(int) override {return "Patch";}
  void changeProgramName(int,const juce::String&) override {}
@@ -26,6 +28,12 @@ public:
  bool isBusy(int layer,bool includePublication=true) const;
  SliceInfo sliceInfo(int layer) const;
  bool exportSlices(const juce::File&,int layer) const;
+ bool exportSequence(const juce::File&) const;
+ void loadSequencePreset(int);void randomizePattern(int);void stopSequence();
+ void loadRackPreset(int rack,int preset);void moveEffect(int rack,int slot,int direction);
+ bool saveRack(const juce::File&,int rack) const;bool loadRack(const juce::File&,int rack);
+ std::atomic<int> playingStep{-1},playingBank{-1};
+ std::atomic<bool> hostSyncActive{false};
  void loadVocalPreset(int);
  void loadHybridPreset(int preset);
  void requestSample(juce::String source,int layer=0);
@@ -50,9 +58,19 @@ private:
   std::array<std::atomic<float>*,3> vocalValues{};
   std::atomic<float>* preserve=nullptr;std::atomic<float>* reverse=nullptr;std::atomic<float>* slicing=nullptr;std::atomic<float>* effect=nullptr;
   std::atomic<float>* enabled=nullptr;std::atomic<float>* generator=nullptr;std::atomic<float>* filter=nullptr;
-  std::array<std::array<std::atomic<float>*,3>,4> routes{};
+  std::array<std::array<std::atomic<float>*,4>,4> routes{};
  };
  std::array<Handles,4> handles;
+ struct FxHandles {std::array<std::atomic<float>*,6> values{};};
+ std::array<std::array<FxHandles,4>,5> fxHandles;
+ std::array<std::atomic<float>*,5> seqFlags{},seqChoices{};
+ std::array<std::atomic<float>*,6> seqControls{};
+ std::array<std::array<std::array<std::atomic<float>*,6>,64>,4> stepHandles{};
+ gboy::seq::Sequencer sequencer;
+ double internalBeat=0,clockBeat=0,clockTempo=120;bool clockRunning=false,lastManualRun=false;
+ gboy::seq::Settings sequenceSettings() const;
+ void inputNote(int,float,int);void renderSegment(float*,float*,int,double);
+ void applyEvents(const gboy::seq::Events&);
  std::atomic<float>* master=nullptr;
  juce::ValueTree defaults;
  void readParameters();

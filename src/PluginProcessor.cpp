@@ -25,6 +25,26 @@ juce::AudioProcessorValueTreeState::ParameterLayout GBoyProcessor::layout(){
   layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{gboy::parameterId(layer,"vSlices"),1},title+"Slice mapping",juce::StringArray{"Whole phrase","8 grid slices","16 grid slices","Detect onsets"},0));
   layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{gboy::parameterId(layer,"vEffect"),1},title+"Effect",juce::StringArray{"Clean","Telephone","Lo-fi","Stutter (120 BPM)"},0));
  }
+ for(int layer=0;layer<4;++layer)for(int route=0;route<4;++route)layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{gboy::routeId(layer,route,"fxTarget"),1},"Layer "+juce::String(layer+1)+" Route "+juce::String(route+1)+" FX override",juce::StringArray{"Voice destination","Layer FX mix","Layer FX amount","Master FX mix","Master FX amount"},0));
+ juce::StringArray effects;for(const auto& spec:gboy::fx::specs)effects.add(spec.name);
+ for(int rack=0;rack<5;++rack)for(int slot=0;slot<4;++slot){
+  const auto title=(rack==4?juce::String("Master"):"Layer "+juce::String(rack+1))+" FX "+juce::String(slot+1)+" ";
+  layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{gboy::fx::parameterId(rack,slot,"type"),1},title+"Type",effects,0));
+  layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{gboy::fx::parameterId(rack,slot,"bypass"),1},title+"Bypass",false));
+  for(const auto* field:{"mix","a","b","c"})layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{gboy::fx::parameterId(rack,slot,field),1},title+field,juce::NormalisableRange<float>(0,1),juce::String(field)=="mix"?.3f:.5f));
+ }
+ for(const auto* flag:{"enabled","sync","run","latch","chain"})layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{"seq_"+juce::String(flag),1},"Sequence "+juce::String(flag),juce::String(flag)=="sync"));
+ auto choice=[&](const char* id,const char* name,juce::StringArray values,int initial){layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{id,1},name,values,initial));};
+ choice("seq_length","Sequence length",{"16","32","64"},0);choice("seq_bank","Sequence bank",{"A","B","C","D"},0);choice("seq_mode","Sequence mode",{"Step","Arp up","Arp down","Arp up-down","Chord"},0);choice("seq_scale","Sequence scale",{"Chromatic","Major","Natural minor","Dorian","Major pentatonic"},0);choice("seq_division","Step duration",{"1/8","1/16","1/32"},1);
+ for(const auto& spec:gboy::seq::controls){const bool integer=juce::String(spec.id)=="seq_root"||juce::String(spec.id)=="seq_key"||juce::String(spec.id)=="seq_octaves"||juce::String(spec.id)=="seq_seed";layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{spec.id,1},spec.name,juce::NormalisableRange<float>(spec.low,spec.high,integer?1.f:0.f),spec.initial));}
+ for(int bank=0;bank<4;++bank)for(int step=0;step<64;++step){const auto initial=gboy::seq::defaultStep(bank,step);const auto title="Bank "+juce::String(bank+1)+" Step "+juce::String(step+1)+" ";
+  layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID{gboy::seq::stepId(bank,step,"enabled"),1},title+"Enabled",initial.enabled));
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{gboy::seq::stepId(bank,step,"pitch"),1},title+"Pitch",juce::NormalisableRange<float>(-24,24,1),float(initial.pitch)));
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{gboy::seq::stepId(bank,step,"velocity"),1},title+"Velocity",juce::NormalisableRange<float>(0,1),initial.velocity));
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{gboy::seq::stepId(bank,step,"gate"),1},title+"Gate",juce::NormalisableRange<float>(.05f,.95f),initial.gate));
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{gboy::seq::stepId(bank,step,"probability"),1},title+"Probability",juce::NormalisableRange<float>(0,1),1.f));
+  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{gboy::seq::stepId(bank,step,"ratchet"),1},title+"Ratchet",juce::NormalisableRange<float>(1,4,1),1.f));
+ }
  return layout;
 }
 GBoyProcessor::GBoyProcessor():AudioProcessor(BusesProperties().withOutput("Output",juce::AudioChannelSet::stereo(),true)),state(*this,nullptr,"GBOY",layout()){
@@ -35,15 +55,18 @@ GBoyProcessor::GBoyProcessor():AudioProcessor(BusesProperties().withOutput("Outp
   for(size_t i=0;i<3;++i)h.vocalValues[i]=state.getRawParameterValue(gboy::parameterId(layer,gboy::vocalSpecs[i].id));
   h.preserve=state.getRawParameterValue(gboy::parameterId(layer,"vPreserve"));h.reverse=state.getRawParameterValue(gboy::parameterId(layer,"vReverse"));h.slicing=state.getRawParameterValue(gboy::parameterId(layer,"vSlices"));h.effect=state.getRawParameterValue(gboy::parameterId(layer,"vEffect"));
   h.enabled=state.getRawParameterValue(gboy::parameterId(layer,"enabled"));h.generator=state.getRawParameterValue(gboy::parameterId(layer,"generator"));h.filter=state.getRawParameterValue(gboy::parameterId(layer,"filter"));
-  for(int route=0;route<4;++route){auto& row=h.routes[size_t(route)];row[0]=state.getRawParameterValue(gboy::routeId(layer,route,"source"));row[1]=state.getRawParameterValue(gboy::routeId(layer,route,"target"));row[2]=state.getRawParameterValue(gboy::routeId(layer,route,"amount"));}
+  for(int route=0;route<4;++route){auto& row=h.routes[size_t(route)];row[0]=state.getRawParameterValue(gboy::routeId(layer,route,"source"));row[1]=state.getRawParameterValue(gboy::routeId(layer,route,"target"));row[2]=state.getRawParameterValue(gboy::routeId(layer,route,"amount"));row[3]=state.getRawParameterValue(gboy::routeId(layer,route,"fxTarget"));}
   auto& slot=slots[size_t(layer)];slot.source="factory:"+juce::String(layer);slot.originalSource=slot.source;slot.original=std::make_unique<gboy::Sample>(gboy::factory(layer));slot.active=new gboy::Sample(*slot.original);slot.info.seconds=double(slot.active->left.size())/slot.active->rate;engine.layers[size_t(layer)].setSample(slot.active);
   slot.message=juce::StringArray{"CHIP PULSE","SOFT KEYS","FM BELL","ARCADE DRUM"}[layer];
   for(size_t i=0;i<128;++i)waveform[size_t(layer)][i].store(slot.active->left[i*40]);
  }
+ const char* fxFields[]={"type","bypass","mix","a","b","c"};for(int rack=0;rack<5;++rack)for(int slot=0;slot<4;++slot)for(size_t field=0;field<6;++field)fxHandles[size_t(rack)][size_t(slot)].values[field]=state.getRawParameterValue(gboy::fx::parameterId(rack,slot,fxFields[field]));
+ const char* flags[]={"enabled","sync","run","latch","chain"};const char* choices[]={"seq_length","seq_bank","seq_mode","seq_scale","seq_division"};for(size_t i=0;i<5;++i){seqFlags[i]=state.getRawParameterValue("seq_"+juce::String(flags[i]));seqChoices[i]=state.getRawParameterValue(choices[i]);}for(size_t i=0;i<6;++i)seqControls[i]=state.getRawParameterValue(gboy::seq::controls[i].id);
+ for(int bank=0;bank<4;++bank)for(int step=0;step<64;++step)for(size_t field=0;field<6;++field)stepHandles[size_t(bank)][size_t(step)][field]=state.getRawParameterValue(gboy::seq::stepId(bank,step,gboy::seq::stepFields[field]));
  worker=std::thread([this]{loadLoop();});
 }
 GBoyProcessor::~GBoyProcessor(){keyboard.removeListener(this);quit=true;worker.join();for(auto& slot:slots){delete slot.pending.exchange(nullptr);delete slot.retired.exchange(nullptr);delete slot.active;}}
-void GBoyProcessor::prepareToPlay(double rate,int){engine.prepare(rate);for(size_t i=0;i<4;++i)engine.layers[i].setSample(slots[i].active);keyboard.reset();}
+void GBoyProcessor::prepareToPlay(double rate,int){engine.prepare(rate);for(size_t i=0;i<4;++i)engine.layers[i].setSample(slots[i].active);keyboard.reset();internalBeat=0;sequencer.clearInput();lastManualRun=false;}
 void GBoyProcessor::requestSample(juce::String source,int layer){if(layer<0||layer>3)return;std::lock_guard lock(mutex);auto& slot=slots[size_t(layer)];slot.requested=std::move(source);slot.hasRequest=true;slot.message="LOADING...";}
 juce::String GBoyProcessor::status(int layer){std::lock_guard lock(mutex);return slots[size_t(juce::jlimit(0,3,layer))].message;}
 void GBoyProcessor::readParameters(){
@@ -51,8 +74,11 @@ void GBoyProcessor::readParameters(){
  for(size_t layer=0;layer<4;++layer){auto& p=engine.layers[layer].params;const auto& h=handles[layer];auto get=[&](size_t i){return h.values[i]->load();};
   p.enabled=h.enabled->load()>.5f;p.generator=gboy::Generator(juce::jlimit(0,5,int(h.generator->load())));p.filter=juce::jlimit(0,3,int(h.filter->load()));
   p.attack=get(0);p.decay=get(1);p.sustain=get(2);p.release=get(3);p.level=get(4);p.pan=get(5);p.tune=get(6);p.cutoff=get(7);p.resonance=get(8);p.shape=get(9);p.ratio=get(10);p.position=get(11);p.grainSize=get(12);p.lfoRate=get(13);p.macro=get(14);
-  for(size_t route=0;route<4;++route){const auto& row=h.routes[route];p.routes[route]={gboy::ModSource(juce::jlimit(0,6,int(row[0]->load()))),gboy::ModTarget(juce::jlimit(0,5,int(row[1]->load()))),row[2]->load()};}
+  for(size_t route=0;route<4;++route){const auto& row=h.routes[route];p.routes[route]={gboy::ModSource(juce::jlimit(0,6,int(row[0]->load()))),gboy::ModTarget(row[3]->load()>.5f?5+juce::jlimit(1,4,int(row[3]->load())):juce::jlimit(0,5,int(row[1]->load()))),row[2]->load()};}
  }
+ for(size_t rack=0;rack<5;++rack)for(size_t slot=0;slot<4;++slot){const auto& values=fxHandles[rack][slot].values;auto& target=rack==4?engine.masterEffects.slots[slot].params:engine.layers[rack].effects.slots[slot].params;target={gboy::fx::Type(juce::jlimit(0,int(gboy::fx::Type::Count)-1,int(values[0]->load()))),values[1]->load()>.5f,values[2]->load(),values[3]->load(),values[4]->load(),values[5]->load()};}
+ const auto config=sequenceSettings();if(config.enabled!=sequencer.configuration().enabled)engine.allOff();sequencer.configure(config);
+
 }
 gboy::vocal::Settings GBoyProcessor::vocalSettings(size_t layer) const {
  const auto& h=handles[layer];gboy::vocal::Settings settings;
@@ -115,24 +141,40 @@ void GBoyProcessor::loadLoop(){
   std::this_thread::sleep_for(std::chrono::milliseconds(10));
  }
 }
-void GBoyProcessor::processBlock(juce::AudioBuffer<float>& b,juce::MidiBuffer& midi){
+gboy::seq::Settings GBoyProcessor::sequenceSettings() const {
+ gboy::seq::Settings next;next.enabled=seqFlags[0]->load()>.5f;next.sync=seqFlags[1]->load()>.5f;next.run=seqFlags[2]->load()>.5f;next.latch=seqFlags[3]->load()>.5f;next.chain=seqFlags[4]->load()>.5f;
+ next.length=16<<juce::jlimit(0,2,int(seqChoices[0]->load()));next.bank=juce::jlimit(0,3,int(seqChoices[1]->load()));next.mode=juce::jlimit(0,4,int(seqChoices[2]->load()));next.scale=juce::jlimit(0,4,int(seqChoices[3]->load()));next.division=.5/std::exp2(double(juce::jlimit(0,2,int(seqChoices[4]->load()))));
+ next.tempo=seqControls[0]->load();next.root=int(seqControls[1]->load());next.swing=seqControls[2]->load();next.key=int(seqControls[3]->load());next.octaves=int(seqControls[4]->load());next.seed=uint32_t(seqControls[5]->load());
+ for(size_t bank=0;bank<4;++bank)for(size_t step=0;step<64;++step){const auto& values=stepHandles[bank][step];next.patterns[bank][step]={values[0]->load()>.5f,int(values[1]->load()),values[2]->load(),values[3]->load(),values[4]->load(),int(values[5]->load())};}
+ return next;
+}
+void GBoyProcessor::inputNote(int note,float velocity,int channel){sequencer.input(note,velocity,channel);if(!sequencer.configuration().enabled){if(velocity>0)engine.noteOn(note,velocity,channel);else engine.noteOff(note,channel);}}
+void GBoyProcessor::applyEvents(const gboy::seq::Events& events){for(int i=0;i<events.count;++i){const auto& event=events.values[size_t(i)];if(event.on)engine.noteOn(event.note,event.velocity,event.channel);else engine.noteOff(event.note,event.channel);}}
+void GBoyProcessor::renderSegment(float* left,float* right,int count,double beat){
+ if(count<=0)return;const double increment=clockTempo/(60*getSampleRate());engine.tempo=clockTempo;engine.beat=beat;
+ if(!sequencer.configuration().enabled||!clockRunning){applyEvents(sequencer.tick(beat,clockRunning));engine.render(left,right,count);return;}
+ int cursor=0;for(int i=0;i<count;++i){const auto events=sequencer.tick(beat+i*increment,true);if(events.count){engine.render(left+cursor,right+cursor,i-cursor);applyEvents(events);cursor=i;}}engine.render(left+cursor,right+cursor,count-cursor);
+}
+void GBoyProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiBuffer& midi){
  juce::ScopedNoDenormals noDenormals;
  for(size_t layer=0;layer<4;++layer){auto& slot=slots[layer];if(slot.retired.load()==nullptr){if(auto* sample=slot.pending.exchange(nullptr)){auto* old=slot.active;slot.active=sample;engine.layers[layer].setSample(sample);slot.retired.store(old);}}}
- readParameters();
+ readParameters();const auto& config=sequencer.configuration();clockTempo=config.tempo;clockBeat=internalBeat;clockRunning=config.run;
+ bool useHost=false;
+ if(config.sync){if(auto* playhead=getPlayHead()){if(auto position=playhead->getPosition()){if(auto bpm=position->getBpm())if(std::isfinite(*bpm)&&*bpm>=20&&*bpm<=400)clockTempo=*bpm;if(auto ppq=position->getPpqPosition()){if(std::isfinite(*ppq)&&std::abs(*ppq)<1e9){useHost=true;clockRunning=position->getIsPlaying();if(clockRunning)clockBeat=*ppq;}}}}}
+ const bool manualRun=!useHost&&config.enabled&&config.run;if(manualRun&&!lastManualRun){internalBeat=clockBeat=0;}lastManualRun=manualRun;hostSyncActive.store(useHost);
  int start1,size1,start2,size2;keyFifo.prepareToRead(256,start1,size1,start2,size2);
- auto apply=[this](int index){const auto& e=keyEvents[size_t(index)];if(e.velocity>0)engine.noteOn(e.note,e.velocity,e.channel);else engine.noteOff(e.note,e.channel);};
- for(int i=0;i<size1;++i)apply(start1+i);for(int i=0;i<size2;++i)apply(start2+i);keyFifo.finishedRead(size1+size2);
- if(panicRequested.exchange(false))engine.allOff();
- b.clear();if(b.getNumChannels()<2)return;
- int pos=0;
- for(const auto meta:midi){if(meta.numBytes>3)continue;int at=juce::jlimit(pos,b.getNumSamples(),meta.samplePosition);engine.render(b.getWritePointer(0)+pos,b.getWritePointer(1)+pos,at-pos);pos=at;
-  auto m=meta.getMessage();if(m.isNoteOn())engine.noteOn(m.getNoteNumber(),m.getFloatVelocity(),m.getChannel());else if(m.isNoteOff())engine.noteOff(m.getNoteNumber(),m.getChannel());else if(m.isPitchWheel())engine.bend(m.getChannel(),float(m.getPitchWheelValue()-8192)/8192.f);else if(m.isController()&&m.getControllerNumber()==1)engine.wheel(m.getChannel(),float(m.getControllerValue())/127.f);else if(m.isAllNotesOff()||m.isAllSoundOff())engine.allOff(m.getChannel());
+ for(int i=0;i<size1;++i){const auto& key=keyEvents[size_t(start1+i)];inputNote(key.note,key.velocity,key.channel);}for(int i=0;i<size2;++i){const auto& key=keyEvents[size_t(start2+i)];inputNote(key.note,key.velocity,key.channel);}keyFifo.finishedRead(size1+size2);
+ if(panicRequested.exchange(false)){engine.allOff();engine.resetEffects();sequencer.clearInput();}
+ buffer.clear();if(buffer.getNumChannels()<2)return;
+ int cursor=0;const double increment=clockTempo/(60*getSampleRate());
+ for(const auto meta:midi){if(meta.numBytes>3)continue;const int at=juce::jlimit(cursor,buffer.getNumSamples(),meta.samplePosition);renderSegment(buffer.getWritePointer(0)+cursor,buffer.getWritePointer(1)+cursor,at-cursor,clockBeat+cursor*increment);cursor=at;
+  const auto message=meta.getMessage();if(message.isNoteOn())inputNote(message.getNoteNumber(),message.getFloatVelocity(),message.getChannel());else if(message.isNoteOff())inputNote(message.getNoteNumber(),0,message.getChannel());else if(message.isPitchWheel())engine.bend(message.getChannel(),float(message.getPitchWheelValue()-8192)/8192.f);else if(message.isController()&&message.getControllerNumber()==1)engine.wheel(message.getChannel(),float(message.getControllerValue())/127);else if(message.isAllNotesOff()||message.isAllSoundOff()){sequencer.clearInput(message.getChannel());engine.allOff(message.getChannel());if(message.isAllSoundOff())engine.resetEffects();}
  }
- engine.render(b.getWritePointer(0)+pos,b.getWritePointer(1)+pos,b.getNumSamples()-pos);
- meter.store(b.getMagnitude(0,b.getNumSamples()));midi.clear();
+ renderSegment(buffer.getWritePointer(0)+cursor,buffer.getWritePointer(1)+cursor,buffer.getNumSamples()-cursor,clockBeat+cursor*increment);internalBeat+=buffer.getNumSamples()*increment;
+ playingStep.store(sequencer.step());playingBank.store(sequencer.bank());meter.store(buffer.getMagnitude(0,buffer.getNumSamples()));midi.clear();
 }
 void GBoyProcessor::getStateInformation(juce::MemoryBlock& block){
- auto tree=state.copyState();tree.setProperty("version",3,nullptr);
+ auto tree=state.copyState();tree.setProperty("version",4,nullptr);
  {std::lock_guard lock(mutex);for(int i=0;i<4;++i)tree.setProperty("sampleSource"+juce::String(i+1),slots[size_t(i)].source,nullptr);}
  auto xml=tree.createXml();copyXmlToBinary(*xml,block);
 }
@@ -183,4 +225,62 @@ void GBoyProcessor::loadVocalPreset(int preset){
   else{set(layer,"vPitch",float(layer==1?4:layer==2?7:0));set(layer,"vStretch",1.25f);set(layer,"pan",layer==1?-.4f:layer==2?.4f:0);set(layer,"attack",.1f);set(layer,"release",.7f);}
  }
  state.replaceState(tree);for(int layer=0;layer<4;++layer)requestSample(layer<count?"vocal:0":"factory:"+juce::String(layer),layer);panicRequested.store(true);
+}
+
+void GBoyProcessor::stopSequence(){for(const auto* id:{"seq_enabled","seq_run"})if(auto* parameter=state.getParameter(id))parameter->setValueNotifyingHost(0);panicRequested.store(true);}
+void GBoyProcessor::loadRackPreset(int rack,int preset){
+ if(rack<0||rack>4)return;std::array<gboy::fx::Parameters,4> slots{};
+ using Type=gboy::fx::Type;
+ if(preset==1){slots[0]={Type::Tape,false,.4f,.25f,.2f,.65f};slots[1]={Type::Chorus,false,.25f,.25f,.35f,.2f};slots[2]={Type::Reverb,false,.25f,.65f,.65f,.75f};}
+ else if(preset==2){slots[0]={Type::Saturation,false,.4f,.5f,.6f,.5f};slots[1]={Type::Bitcrusher,false,.3f,.45f,0,0};}
+ else if(preset==3){slots[0]={Type::Shimmer,false,.35f,.7f,.8f,.65f};slots[1]={Type::Delay,false,.25f,.5f,.4f,.75f};}
+ else if(preset==4){slots[0]={Type::PingPong,false,.35f,.65f,.6f,.7f};slots[1]={Type::Duck,false,1,.5f,.8f,.4f};slots[2]={Type::Limiter,false,1,.95f,.4f,0};}
+ else if(preset==5){slots[0]={Type::Convolution,false,.4f,.65f,.6f,.8f};slots[1]={Type::Compressor,false,.6f,.7f,.1f,.4f};}
+ const char* fields[]={"type","bypass","mix","a","b","c"};
+ for(int slot=0;slot<4;++slot){const auto& config=slots[size_t(slot)];const float values[]={float(config.type),config.bypass?1.f:0.f,config.mix,config.a,config.b,config.c};for(size_t i=0;i<6;++i)if(auto* parameter=state.getParameter(gboy::fx::parameterId(rack,slot,fields[i])))parameter->setValueNotifyingHost(parameter->convertTo0to1(values[i]));}
+}
+void GBoyProcessor::moveEffect(int rack,int slot,int direction){
+ const int other=slot+direction;if(rack<0||rack>4||slot<0||slot>3||other<0||other>3)return;const char* fields[]={"type","bypass","mix","a","b","c"};
+ std::array<float,6> a{},b{};for(size_t i=0;i<6;++i){a[i]=fxHandles[size_t(rack)][size_t(slot)].values[i]->load();b[i]=fxHandles[size_t(rack)][size_t(other)].values[i]->load();}
+ for(size_t i=0;i<6;++i){auto* first=state.getParameter(gboy::fx::parameterId(rack,slot,fields[i]));auto* second=state.getParameter(gboy::fx::parameterId(rack,other,fields[i]));first->setValueNotifyingHost(first->convertTo0to1(b[i]));second->setValueNotifyingHost(second->convertTo0to1(a[i]));}
+}
+bool GBoyProcessor::saveRack(const juce::File& file,int rack) const {
+ if(rack<0||rack>4)return false;juce::XmlElement root("GBFX");root.setAttribute("version",1);const char* fields[]={"type","bypass","mix","a","b","c"};
+ for(int slot=0;slot<4;++slot){auto* child=root.createNewChildElement("SLOT");child->setAttribute("index",slot);for(size_t field=0;field<6;++field)child->setAttribute(fields[field],double(fxHandles[size_t(rack)][size_t(slot)].values[field]->load()));}
+ return file.replaceWithText(root.toString());
+}
+bool GBoyProcessor::loadRack(const juce::File& file,int rack){
+ if(rack<0||rack>4||file.getSize()>1024*1024)return false;auto xml=juce::XmlDocument::parse(file);if(!xml||!xml->hasTagName("GBFX")||xml->getIntAttribute("version")!=1||xml->getNumChildElements()!=4)return false;
+ const char* fields[]={"type","bypass","mix","a","b","c"};std::array<std::array<float,6>,4> values{};std::array<bool,4> found{};
+ for(auto* child=xml->getFirstChildElement();child;child=child->getNextElement()){const int index=child->getIntAttribute("index",-1);if(!child->hasTagName("SLOT")||index<0||index>3||found[size_t(index)])return false;found[size_t(index)]=true;for(size_t field=0;field<6;++field){if(!child->hasAttribute(fields[field]))return false;const float value=float(child->getDoubleAttribute(fields[field]));if(!std::isfinite(value)||value<0||value>(field==0?float(int(gboy::fx::Type::Count)-1):1.f))return false;values[size_t(index)][field]=value;}}
+ for(int slot=0;slot<4;++slot)for(size_t field=0;field<6;++field){auto* parameter=state.getParameter(gboy::fx::parameterId(rack,slot,fields[field]));parameter->setValueNotifyingHost(parameter->convertTo0to1(values[size_t(slot)][field]));}return true;
+}
+void GBoyProcessor::loadSequencePreset(int preset){
+ auto set=[&](const std::string& id,float value){if(auto* parameter=state.getParameter(id))parameter->setValueNotifyingHost(parameter->convertTo0to1(value));};
+ set("seq_mode",preset==1?1.f:preset==3?4.f:0.f);set("seq_length",0);set("seq_division",1);set("seq_swing",preset==2?.2f:0.f);set("seq_scale",preset==1?2.f:1.f);set("seq_chain",0);set("seq_bank",0);
+ for(int bank=0;bank<4;++bank)for(int index=0;index<64;++index){auto step=gboy::seq::defaultStep(bank,index);if(preset==1){step.pitch=0;step.gate=.4f;step.enabled=true;}else if(preset==2){step.pitch=index%4==0?0:7;step.enabled=index%8!=5;step.probability=index%4==0?1.f:.7f;step.ratchet=index%8==6?3:1;step.gate=.3f;}else if(preset==3){step.pitch=index%8<4?0:5;step.enabled=index%4==0;step.gate=.9f;}const float values[]={step.enabled?1.f:0.f,float(step.pitch),step.velocity,step.gate,step.probability,float(step.ratchet)};for(size_t field=0;field<6;++field)set(gboy::seq::stepId(bank,index,gboy::seq::stepFields[field]),values[field]);}
+}
+void GBoyProcessor::randomizePattern(int bank){
+ if(bank<0||bank>3)return;auto set=[&](const std::string& id,float value){if(auto* parameter=state.getParameter(id))parameter->setValueNotifyingHost(parameter->convertTo0to1(value));};uint32_t seed=uint32_t(seqControls[5]->load())+1;if(seed>1000000)seed=1;set("seq_seed",float(seed));auto random=[&](){seed=gboy::seq::hash(seed+0x9e3779b9u);return float(double(seed)/4294967295.);};
+ for(int index=0;index<64;++index){const float values[]={(index==0||random()>.3f)?1.f:0.f,float(int(random()*25)-12),.4f+random()*.6f,.2f+random()*.7f,.6f+random()*.4f,float(1+int(random()*3.99f))};for(size_t field=0;field<6;++field)set(gboy::seq::stepId(bank,index,gboy::seq::stepFields[field]),values[field]);}
+}
+bool GBoyProcessor::exportSequence(const juce::File& file) const {
+ auto settings=sequenceSettings();settings.enabled=true;settings.sync=false;settings.run=true;gboy::seq::Sequencer exportEngine;exportEngine.configure(settings);if(settings.mode>=1&&settings.mode<=3)for(int interval:{0,4,7})exportEngine.input(std::min(127,settings.root+interval),1);
+ juce::MidiMessageSequence track;auto tempo=juce::MidiMessage::tempoMetaEvent(int(60000000/settings.tempo));tempo.setTimeStamp(0);track.addEvent(tempo);
+ auto append=[&](const gboy::seq::Events& events,int tick){for(int i=0;i<events.count;++i){const auto& event=events.values[size_t(i)];auto message=event.on?juce::MidiMessage::noteOn(event.channel,event.note,event.velocity):juce::MidiMessage::noteOff(event.channel,event.note);message.setTimeStamp(tick);track.addEvent(message);}};
+ const double beats=settings.length*settings.division*(settings.chain?4:1);const int ticks=int(std::llround(beats*960));for(int tick=0;tick<ticks;++tick)append(exportEngine.tick(double(tick)/960,true),tick);append(exportEngine.tick(beats,false),ticks);track.updateMatchedPairs();
+ juce::MidiFile midi;midi.setTicksPerQuarterNote(960);midi.addTrack(track);auto output=file.createOutputStream();if(!output||!output->setPosition(0)||output->truncate().failed())return false;return midi.writeTo(*output);
+}
+
+double GBoyProcessor::getTailLengthSeconds() const {
+ auto rackTail=[&](size_t rack){double total=0;for(const auto& slot:fxHandles[rack]){const auto& p=slot.values;const auto type=gboy::fx::Type(juce::jlimit(0,int(gboy::fx::Type::Count)-1,int(p[0]->load())));if(type==gboy::fx::Type::Off||p[1]->load()>.5f)continue;const float a=gboy::fx::physical(type,0,p[3]->load()),b=gboy::fx::physical(type,1,p[4]->load()),c=gboy::fx::physical(type,2,p[5]->load());double delay=0,feedback=0;
+  if(type==gboy::fx::Type::Delay||type==gboy::fx::Type::PingPong){delay=a*.001;feedback=b;}
+  else if(type==gboy::fx::Type::Reverb){delay=a*.0023;feedback=b;}
+  else if(type==gboy::fx::Type::Shimmer){delay=b*.0023+.04;feedback=c;}
+  else if(type==gboy::fx::Type::Resonator){delay=1/a;feedback=b;}
+  else if(type==gboy::fx::Type::Chorus||type==gboy::fx::Type::Flanger){delay=.03;feedback=c;}
+  if(delay>0)total+=delay*(1+std::log(1e-5)/std::log(std::clamp(feedback,.001,.95)));
+  else total+=type==gboy::fx::Type::Convolution?a*.001+.2:type==gboy::fx::Type::EQ||type==gboy::fx::Type::FilterSweep?2.:.1;
+ }return total;};
+ double layers=0;for(size_t layer=0;layer<4;++layer)layers=std::max(layers,double(handles[layer].values[3]->load())+rackTail(layer));return std::clamp(layers+rackTail(4)+1,1.,600.);
 }

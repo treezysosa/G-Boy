@@ -1,0 +1,17 @@
+# Phase 4 implementation contract
+
+Effects use four serial slots per layer plus four master slots. Slots have an effect choice, bypass, wet/dry mix and three effect-specific parameters. All storage is prepared outside rendering. Existing modulation destination parameters retain their IDs, choices and ranges; new FX override parameters route to layer/master effect mix and primary amount without changing old normalized automation. Rack presets, ordering and patch state use stable parameter IDs appended after Phase 3 parameters.
+
+The rack implements EQ, compression, limiting, saturation, distortion, bit depth/sample-rate reduction, tape, vinyl noise, chorus/flanger/phaser, tremolo/pan, stereo/ping-pong delay, algorithmic reverb, convolution with a generated sparse factory IR, shimmer, filter sweep, resonator, ring modulation, transient shaping, width, rhythmic ducking and pitch modulation. Convolution uses an original short sparse IR, not an imported long IR or a substitute algorithmic reverb. Ducking uses the beat clock, not an external sidechain bus.
+
+The sequencer owns four 64-step banks, active lengths 16/32/64, step pitch/velocity/gate/probability/ratchets, swing, key/scale locking and optional bank chaining. Modes are step, ascending/descending/up-down arp and chord. Input notes are tracked in fixed arrays; enabled sequencing replaces direct note playback. An event buffer bounds generated events. Host PPQ/BPM drives synced playback; manual clock/tempo supports standalone use. Stop, transport jumps and mode changes release generated notes. MIDI export uses this same scheduler with deterministic probability and includes tempo metadata.
+
+A piano-roll grid shows 16 steps per page, with a selected-step editor. FX and SEQ pages connect to real parameters. State version 4 supplies neutral FX and disabled sequencing when migrating older presets. Factory patterns and rack settings are original; none depend on recorded game audio.
+
+## Verification scope and limits
+
+Effects tests cover all 27 choices (Off + 26 effects) at four sample rates, bit-exact bypass, wet delay impulse timing, limiter ceiling, width and convolution tails. Sequencer tests cover sample timing, gates, swing, ratchets, probability, three arp directions, octave expansion, chords, stop/seek, scales, chaining and latch. Allocation tests activate all 20 effect slots across every type and exercise generated chord events without heap allocations. Address/undefined-behavior sanitizer checks cover effects and sequencer cores, with leak checking disabled in the traced workspace.
+
+Native integration tests cover rack files/order, full FX/pattern recall, audible internal sequencing, exported notes/releases and a simulated host PPQ/stop. Windows/macOS build results will be recorded after CI.
+
+The effects are original compact algorithms, not third-party commercial processors. EQ is one peaking band per slot; convolution uses a 64-tap generated sparse IR, not file-imported long responses. Ducking is beat-based, not an external audio sidechain. Nonlinear effects are not oversampled. Pitch modulation uses dual delay heads with wet-path delay. All need listening and CPU validation in DAWs. Per-rack modulation is shared across slots and runs at render-chunk control rate. Full per-slot arbitrary matrix routing, long-IR import, realtime MIDI output/drag-export and mastering-grade oversampling remain future work.
