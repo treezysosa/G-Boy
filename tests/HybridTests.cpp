@@ -34,6 +34,13 @@ int main(){
   synth->wheel(1,wheel);synth->noteOn(69,1);std::vector<float> audio(12000),right(audio.size());synth->render(audio.data(),right.data(),int(audio.size()));return audio;
  };
  const auto dry=render({},0,0);
+ auto crossings=[](const std::vector<float>& audio){int count=0;for(size_t i=6001;i<audio.size();++i)if(audio[i-1]<=0&&audio[i]>0)++count;return count;};
+ require(std::abs(crossings(dry)-55)<=1,"A4 oscillator tuned to 440 Hz");
+ auto octave=render({gboy::ModSource::Wheel,gboy::ModTarget::Pitch,1},1,0);require(std::abs(crossings(octave)-110)<=1,"wheel to pitch is one octave at full amount");
+ auto filterEnergy=[](int mode,double frequency){gboy::StateVariableFilter filter;filter.configure(1000,.1f,48000);double sum=0;for(int i=0;i<24000;++i){float out=filter.process(float(std::sin(gboy::tau*frequency*i/48000)),mode);if(i>12000)sum+=out*out;}return sum;};
+ require(filterEnergy(1,100)>filterEnergy(1,10000)*20,"low-pass attenuates high frequencies");
+ require(filterEnergy(3,10000)>filterEnergy(3,100)*20,"high-pass attenuates low frequencies");
+ require(filterEnergy(2,1000)>filterEnergy(2,100)*10&&filterEnergy(2,1000)>filterEnergy(2,10000)*10,"band-pass response centred at cutoff");
  for(int source=1;source<int(gboy::ModSource::Count);++source){auto modulated=render({gboy::ModSource(source),gboy::ModTarget::Pitch,.8f},1,1);double difference=0;for(size_t i=0;i<dry.size();++i)difference+=std::abs(dry[i]-modulated[i]);require(difference>1,"every modulation source reaches audio");}
  // Buffer partitioning must not change oscillators or modulation timing.
  auto a=std::make_unique<gboy::HybridEngine>(),b=std::make_unique<gboy::HybridEngine>();

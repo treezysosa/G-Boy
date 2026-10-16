@@ -57,7 +57,7 @@ void GBoyProcessor::loadLoop(){
    if(next.startsWith("factory:")){int k=next.substring(8).getIntValue();if(k>=0&&k<4)s=std::make_unique<gboy::Sample>(gboy::factory(k));}
    else{
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(juce::File(next)));
-    if(reader && reader->lengthInSamples>1 && reader->lengthInSamples<=192000*30 && reader->numChannels>0){
+    if(reader && std::isfinite(reader->sampleRate) && reader->sampleRate>=8000 && reader->sampleRate<=192000 && reader->lengthInSamples>1 && double(reader->lengthInSamples)<=reader->sampleRate*30 && reader->numChannels>0){
      juce::AudioBuffer<float> b(2,int(reader->lengthInSamples));
      if(reader->read(&b,0,b.getNumSamples(),0,true,true)){
       s=std::make_unique<gboy::Sample>();s->rate=reader->sampleRate;
@@ -88,7 +88,7 @@ void GBoyProcessor::processBlock(juce::AudioBuffer<float>& b,juce::MidiBuffer& m
  if(panicRequested.exchange(false))engine.allOff();
  b.clear();if(b.getNumChannels()<2)return;
  int pos=0;
- for(const auto meta:midi){int at=juce::jlimit(pos,b.getNumSamples(),meta.samplePosition);engine.render(b.getWritePointer(0)+pos,b.getWritePointer(1)+pos,at-pos);pos=at;
+ for(const auto meta:midi){if(meta.numBytes>3)continue;int at=juce::jlimit(pos,b.getNumSamples(),meta.samplePosition);engine.render(b.getWritePointer(0)+pos,b.getWritePointer(1)+pos,at-pos);pos=at;
   auto m=meta.getMessage();if(m.isNoteOn())engine.noteOn(m.getNoteNumber(),m.getFloatVelocity(),m.getChannel());else if(m.isNoteOff())engine.noteOff(m.getNoteNumber(),m.getChannel());else if(m.isPitchWheel())engine.bend(m.getChannel(),float(m.getPitchWheelValue()-8192)/8192.f);else if(m.isController()&&m.getControllerNumber()==1)engine.wheel(m.getChannel(),float(m.getControllerValue())/127.f);else if(m.isAllNotesOff()||m.isAllSoundOff())engine.allOff(m.getChannel());
  }
  engine.render(b.getWritePointer(0)+pos,b.getWritePointer(1)+pos,b.getNumSamples()-pos);

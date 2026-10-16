@@ -23,6 +23,13 @@ int main(){
  for(int layer=1;layer<4;++layer)require(p->state.getRawParameterValue(gboy::parameterId(layer,"enabled"))->load()==0,"Phase 1 extra layers disabled");
  require(p->state.getRawParameterValue(gboy::routeId(2,0,"amount"))->load()==0,"old matrix does not leak into legacy state");
  p->requestSample("/a-missing-gboy-file.wav",2);settle(*p);require(p->status(2).startsWith("Cannot load"),"missing sample reported");
+ // Decode a real mono WAV through the worker, into only layer 4.
+ juce::TemporaryFile temporary(".wav");juce::WavAudioFormat format;auto stream=temporary.getFile().createOutputStream();require(stream!=nullptr,"temporary WAV stream");
+ std::unique_ptr<juce::AudioFormatWriter> writer(format.createWriterFor(stream.get(),44100,1,16,{},0));require(writer!=nullptr,"WAV writer");stream.release();
+ juce::AudioBuffer<float> tone(1,4410);for(int i=0;i<tone.getNumSamples();++i)tone.setSample(0,i,float(std::sin(gboy::tau*220*i/44100))*.5f);require(writer->writeFromAudioSampleBuffer(tone,0,tone.getNumSamples()),"write WAV");writer.reset();
+ const auto layer1Status=p->status(0);p->requestSample(temporary.getFile().getFullPathName(),3);settle(*p);require(p->status(0)==layer1Status,"import isolated from layer 1");require(p->status(3)==temporary.getFile().getFileName(),"real WAV decoded");
+ set(*p,gboy::parameterId(0,"enabled"),0);set(*p,gboy::parameterId(3,"enabled"),1);midi.addEvent(juce::MidiMessage::noteOn(1,60,.8f),0);p->processBlock(buffer,midi);require(buffer.getMagnitude(0,256)>0,"imported layer sample plays");
+ for(int preset=0;preset<4;++preset){p->loadHybridPreset(preset);settle(*p);midi.addEvent(juce::MidiMessage::noteOn(1,60,.8f),0);p->processBlock(buffer,midi);require(buffer.getMagnitude(0,256)>0,"hybrid factory preset audible");}
  p->setStateInformation("invalid",7);p->setStateInformation(nullptr,0);
  std::cout<<"PASS processor: layer/matrix recall, sample-offset MIDI, wheel/bend, Phase 1 migration, missing sample\n";
 }
