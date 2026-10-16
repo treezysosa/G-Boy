@@ -19,7 +19,14 @@ GCC 14.2.0 in the supplied Linux workspace. CMake and JUCE remain unavailable lo
 
 ## Phase 2 CI verification
 
-The workflow compiles Windows VST3/standalone and macOS VST3/AU/standalone, runs core/hybrid/allocation tests, and runs a JUCE integration test for per-layer and matrix state recall, Phase 1 migration, sample-offset MIDI, pitch bend/CC1, missing files, real WAV loading and factory patch audibility. Final workflow results will be recorded after CI completes.
+The workflow compiles Windows VST3/standalone and macOS VST3/AU/standalone, runs core/hybrid/allocation tests, and runs a JUCE integration test for per-layer and matrix state recall, Phase 1 migration, sample-offset MIDI, pitch bend/CC1, missing files, real WAV loading and factory patch audibility. [GitHub run 38903075715](https://github.com/treezysosa/G-Boy/actions/runs/38903075715) successfully compiled all targets on Windows and macOS. All **4/4 tests passed on each platform**: `audio_core`, `hybrid_core`, `realtime_allocations`, and `plugin_processor`. Factory-content generation and artifact upload succeeded on both.
+
+Built source commit: `2ce46e5e7dd63079f224c6d0162fb7ec0c881ada`.
+
+- [Windows VST3 + standalone](https://github.com/treezysosa/G-Boy/actions/runs/38903075715/artifacts/12046589328)
+- [macOS VST3 + AU + standalone](https://github.com/treezysosa/G-Boy/actions/runs/38903075715/artifacts/12046479521)
+
+These are development artifacts, not signed installers. Interactive GUI, DAW compatibility, actual audio devices and Intel/universal macOS deployment remain unverified. Parameter recall was tested using tight floating-point tolerances, since normalized range conversion can introduce rounding. The engine itself is allocation-tested; the full host callback has not been instrumented.
 
 ## Remaining checks and development
 

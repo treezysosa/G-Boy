@@ -41,5 +41,23 @@
       "sample_rate": 44100,
       "category": "RETRO GAME"
     }
+  ],
+  "renders": [
+    {
+      "name": "Phase 1 demo",
+      "file": "Phase1-Demo.wav",
+      "source": "Original procedural synthesis and offline MIDI render: tools/GenerateContent.cpp",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "sample_rate": 48000
+    },
+    {
+      "name": "Phase 2 demo",
+      "file": "Phase2-Demo.wav",
+      "source": "Original procedural synthesis and offline MIDI render: tools/GenerateContent.cpp",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "sample_rate": 48000
+    }
   ]
 }

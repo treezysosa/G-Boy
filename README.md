@@ -12,14 +12,14 @@ Use LAYER 1–4 to edit a layer, enable it, and choose Sampler, Virtual analog, 
 - **Virtual analog:** continuous sine → PolyBLEP saw → PolyBLEP pulse morph.
 - **Wavetable:** three original frames with interpolation and six harmonic-limited mip levels. User wavetable import is not implemented.
 - **FM:** two sine operators, ratio control and shape/index control. No oversampling; high modulation indices and high notes can alias.
-- **Granular:** four overlapping Hann-window grains per voice, position and grain size controls; pitch follows MIDI. This is not a full time-stretch or vocal formant engine.
+- **Granular:** four overlapping Hann-window grains per voice, position and grain size controls; pitch follows MIDI and grains wrap around sample boundaries. This is not a full time-stretch or vocal formant engine.
 - **Filter:** per-voice stereo topology-preserving state variable filter with bypass/LP/BP/HP modes and resonance.
 - **Modulation:** four source/destination/bipolar-amount rows per layer. Sources: LFO, ADSR, velocity, CC1 mod wheel, note, macro. Targets: pitch (12 semitones per unit), cutoff (4 octaves), gain, pan, grain position and oscillator shape/FM index. Control rate is one update per 16 samples with smoothing. The LFO is free-running in Hz; there is no tempo sync or drag/drop routing yet.
 - **MIDI:** per-channel ±2-semitone pitch bend and CC1. Hardware MIDI uses sample offsets; on-screen keys are queued for the next audio block.
 
 The VA/WT/FM shape control affects those modes; FM ratio affects FM, grain controls affect Granular, and cutoff/resonance require an enabled filter. This keeps a single compact panel while retaining separate parameter values for every layer.
 
-The Hybrid patches menu loads four original configurations: Handheld Stack, Glacier Grains, Indigo Bass and FM Prism. It replaces the entire patch. The factory-sample menu and IMPORT affect only the selected layer. SAVE/LOAD applies to all four layers. Phase 1 `.gboy` presets migrate with extra layers disabled and new parameters reset to defaults; the original parameter IDs and plugin ID remain unchanged. Sample paths are not embedded or relocated automatically.
+The Hybrid patches menu loads four original configurations: Handheld Stack, Glacier Grains, Indigo Bass and FM Prism. It replaces the entire patch. The factory-sample menu and IMPORT affect only the selected layer. SAVE/LOAD applies to all four layers. Phase 1 `.gboy` presets migrate with extra layers disabled and new parameters reset to defaults; the original parameter IDs and plugin ID remain unchanged. Phase 2 uses different layer gain staging and a constant-power pan law, so old patches are not guaranteed to match Phase 1 loudness exactly. Sample paths are not embedded or relocated automatically. Wait for sample loading to finish before playback or offline export; a host load-completion barrier is not implemented.
 
 A reference sampler remains in `src/audio/Engine.h` for Phase 1 regression checks; `src/audio/HybridEngine.h` is the live plugin engine. Listen to `factory-content/Phase2-Demo.wav` for a real offline four-layer render.
 
