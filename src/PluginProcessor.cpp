@@ -67,7 +67,7 @@ GBoyProcessor::GBoyProcessor(juce::File libraryHome):AudioProcessor(BusesPropert
  worker=std::thread([this]{loadLoop();});
 }
 GBoyProcessor::~GBoyProcessor(){keyboard.removeListener(this);quit=true;worker.join();delete previewPending.exchange(nullptr);delete previewRetired.exchange(nullptr);delete previewActive;for(auto& slot:slots){delete slot.pending.exchange(nullptr);delete slot.retired.exchange(nullptr);delete slot.active;}}
-void GBoyProcessor::prepareToPlay(double rate,int){processingRate=std::isfinite(rate)&&rate>0?rate:44100;engine.prepare(processingRate);previewEngine.prepare(processingRate);previewEngine.setSample(previewActive);for(size_t i=0;i<4;++i)engine.layers[i].setSample(slots[i].active);keyboard.reset();internalBeat=0;sequencer.clearInput();lastManualRun=false;}
+void GBoyProcessor::prepareToPlay(double rate,int){processingRate=std::isfinite(rate)&&rate>0?rate:44100;engine.prepare(processingRate);previewEngine.prepare(processingRate);previewEngine.setSample(previewActive?&previewActive->sample:nullptr);for(size_t i=0;i<4;++i)engine.layers[i].setSample(slots[i].active);keyboard.reset();internalBeat=0;sequencer.clearInput();lastManualRun=false;}
 void GBoyProcessor::requestSample(juce::String source,int layer,int root,juce::String assetId){if(layer<0||layer>3)return;std::lock_guard lock(mutex);auto& slot=slots[size_t(layer)];slot.requested=std::move(source);slot.requestedRoot=juce::jlimit(0,127,root);slot.requestedAsset=std::move(assetId);slot.hasRequest=true;slot.message="LOADING...";}
 juce::String GBoyProcessor::status(int layer){std::lock_guard lock(mutex);return slots[size_t(juce::jlimit(0,3,layer))].message;}
 void GBoyProcessor::readParameters(){
@@ -312,11 +312,11 @@ void GBoyProcessor::buildPreview(const juce::String& id,uint64_t generation){
   }
   const size_t count=std::min(sample->left.size(),size_t(sample->rate*3));sample->left.resize(count);sample->right.resize(count);sample->root=entry.kind=="sample"?entry.root:60;double peak=0;for(size_t i=0;i<count;++i){for(auto* data:{&sample->left,&sample->right}){auto& value=(*data)[i];value=std::isfinite(value)?value:0;peak=std::max(peak,double(std::abs(value)));}}
   const float gain=float(std::min(8.,.7/std::max(.001,peak)));for(size_t i=0;i<count;++i){const float fade=float(std::min(1.,double(count-i)/(sample->rate*.04)));sample->left[i]*=gain*fade;sample->right[i]*=gain*fade;}
-  std::lock_guard lock(mutex);if(generation==previewGeneration&&!quit){delete previewPending.exchange(sample.release());previewBusy.store(false);}
+  std::lock_guard lock(mutex);if(generation==previewGeneration&&!quit){delete previewPending.exchange(new PreviewBuffer{std::move(*sample),generation});previewBusy.store(false);}
  }catch(...){std::lock_guard lock(mutex);if(generation==previewGeneration)previewBusy.store(false);}
 }
 void GBoyProcessor::mixPreview(juce::AudioBuffer<float>& buffer){
  if(isNonRealtime()){++previewGeneration;previewBusy.store(false);previewEngine.allOff();if(previewRetired.load()==nullptr)if(auto* canceled=previewPending.exchange(nullptr))previewRetired.store(canceled);return;}
- if(previewStop.exchange(false))previewEngine.allOff();if(previewRetired.load()==nullptr)if(auto* next=previewPending.exchange(nullptr)){auto* old=previewActive;previewActive=next;previewEngine.setSample(next);previewRetired.store(old);previewEngine.params.volume=.8f;previewEngine.params.attack=.003f;previewEngine.params.release=.04f;previewEngine.params.sustain=1;previewEngine.noteOn(next->root,1);}
+ if(previewStop.exchange(false))previewEngine.allOff();if(previewRetired.load()==nullptr)if(auto* next=previewPending.exchange(nullptr)){if(next->generation!=previewGeneration.load()){previewRetired.store(next);return;}auto* old=previewActive;previewActive=next;previewEngine.setSample(&next->sample);previewRetired.store(old);previewEngine.params.volume=.8f;previewEngine.params.attack=.003f;previewEngine.params.release=.04f;previewEngine.params.sustain=1;previewEngine.noteOn(next->sample.root,1);}
  std::array<float,256> left{},right{};for(int offset=0;offset<buffer.getNumSamples();offset+=256){const int count=std::min(256,buffer.getNumSamples()-offset);previewEngine.render(left.data(),right.data(),count);for(int i=0;i<count;++i){buffer.addSample(0,offset+i,left[size_t(i)]);buffer.addSample(1,offset+i,right[size_t(i)]);}}
 }
