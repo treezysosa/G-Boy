@@ -67,7 +67,7 @@ private:
  std::array<std::atomic<float>*,6> seqControls{};
  std::array<std::array<std::array<std::atomic<float>*,6>,64>,4> stepHandles{};
  gboy::seq::Sequencer sequencer;
- double internalBeat=0,clockBeat=0,clockTempo=120;bool clockRunning=false,lastManualRun=false;
+ double processingRate=44100,internalBeat=0,clockBeat=0,clockTempo=120;bool clockRunning=false,lastManualRun=false;
  gboy::seq::Settings sequenceSettings() const;
  void inputNote(int,float,int);void renderSegment(float*,float*,int,double);
  void applyEvents(const gboy::seq::Events&);

@@ -66,7 +66,7 @@ GBoyProcessor::GBoyProcessor():AudioProcessor(BusesProperties().withOutput("Outp
  worker=std::thread([this]{loadLoop();});
 }
 GBoyProcessor::~GBoyProcessor(){keyboard.removeListener(this);quit=true;worker.join();for(auto& slot:slots){delete slot.pending.exchange(nullptr);delete slot.retired.exchange(nullptr);delete slot.active;}}
-void GBoyProcessor::prepareToPlay(double rate,int){engine.prepare(rate);for(size_t i=0;i<4;++i)engine.layers[i].setSample(slots[i].active);keyboard.reset();internalBeat=0;sequencer.clearInput();lastManualRun=false;}
+void GBoyProcessor::prepareToPlay(double rate,int){processingRate=std::isfinite(rate)&&rate>0?rate:44100;engine.prepare(processingRate);for(size_t i=0;i<4;++i)engine.layers[i].setSample(slots[i].active);keyboard.reset();internalBeat=0;sequencer.clearInput();lastManualRun=false;}
 void GBoyProcessor::requestSample(juce::String source,int layer){if(layer<0||layer>3)return;std::lock_guard lock(mutex);auto& slot=slots[size_t(layer)];slot.requested=std::move(source);slot.hasRequest=true;slot.message="LOADING...";}
 juce::String GBoyProcessor::status(int layer){std::lock_guard lock(mutex);return slots[size_t(juce::jlimit(0,3,layer))].message;}
 void GBoyProcessor::readParameters(){
@@ -151,7 +151,7 @@ gboy::seq::Settings GBoyProcessor::sequenceSettings() const {
 void GBoyProcessor::inputNote(int note,float velocity,int channel){sequencer.input(note,velocity,channel);if(!sequencer.configuration().enabled){if(velocity>0)engine.noteOn(note,velocity,channel);else engine.noteOff(note,channel);}}
 void GBoyProcessor::applyEvents(const gboy::seq::Events& events){for(int i=0;i<events.count;++i){const auto& event=events.values[size_t(i)];if(event.on)engine.noteOn(event.note,event.velocity,event.channel);else engine.noteOff(event.note,event.channel);}}
 void GBoyProcessor::renderSegment(float* left,float* right,int count,double beat){
- if(count<=0)return;const double increment=clockTempo/(60*getSampleRate());engine.tempo=clockTempo;engine.beat=beat;
+ if(count<=0)return;const double increment=clockTempo/(60*processingRate);engine.tempo=clockTempo;engine.beat=beat;
  if(!sequencer.configuration().enabled||!clockRunning){applyEvents(sequencer.tick(beat,clockRunning));engine.render(left,right,count);return;}
  int cursor=0;for(int i=0;i<count;++i){const auto events=sequencer.tick(beat+i*increment,true);if(events.count){engine.render(left+cursor,right+cursor,i-cursor);applyEvents(events);cursor=i;}}engine.render(left+cursor,right+cursor,count-cursor);
 }
@@ -166,7 +166,7 @@ void GBoyProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiBuff
  for(int i=0;i<size1;++i){const auto& key=keyEvents[size_t(start1+i)];inputNote(key.note,key.velocity,key.channel);}for(int i=0;i<size2;++i){const auto& key=keyEvents[size_t(start2+i)];inputNote(key.note,key.velocity,key.channel);}keyFifo.finishedRead(size1+size2);
  if(panicRequested.exchange(false)){engine.allOff();engine.resetEffects();sequencer.clearInput();}
  buffer.clear();if(buffer.getNumChannels()<2)return;
- int cursor=0;const double increment=clockTempo/(60*getSampleRate());
+ int cursor=0;const double increment=clockTempo/(60*processingRate);
  for(const auto meta:midi){if(meta.numBytes>3)continue;const int at=juce::jlimit(cursor,buffer.getNumSamples(),meta.samplePosition);renderSegment(buffer.getWritePointer(0)+cursor,buffer.getWritePointer(1)+cursor,at-cursor,clockBeat+cursor*increment);cursor=at;
   const auto message=meta.getMessage();if(message.isNoteOn())inputNote(message.getNoteNumber(),message.getFloatVelocity(),message.getChannel());else if(message.isNoteOff())inputNote(message.getNoteNumber(),0,message.getChannel());else if(message.isPitchWheel())engine.bend(message.getChannel(),float(message.getPitchWheelValue()-8192)/8192.f);else if(message.isController()&&message.getControllerNumber()==1)engine.wheel(message.getChannel(),float(message.getControllerValue())/127);else if(message.isAllNotesOff()||message.isAllSoundOff()){sequencer.clearInput(message.getChannel());engine.allOff(message.getChannel());if(message.isAllSoundOff())engine.resetEffects();}
  }
