@@ -1,0 +1,33 @@
+name: Build and test
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  plugin:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Compile
+        run: cmake --build build --config Release --parallel 2
+      - name: Core tests
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Generate factory audio
+        shell: bash
+        run: |
+          if [ -f build/Release/gboy_generate_content.exe ]; then
+            build/Release/gboy_generate_content.exe
+          else
+            build/gboy_generate_content
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: G-Boy-${{ matrix.os }}
+          if-no-files-found: error
+          path: |
+            build/GBoy_artefacts/Release/
+            factory-content/
+            README.md
+            LICENSE
