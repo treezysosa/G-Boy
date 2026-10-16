@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include <iostream>
+#include <iomanip>
 #include <stdexcept>
 void require(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 void set(GBoyProcessor& p,const std::string& id,float value){auto* param=p.state.getParameter(id);require(param!=nullptr,"parameter exists");param->setValueNotifyingHost(param->convertTo0to1(value));}
@@ -18,7 +19,7 @@ int main(){
  juce::MemoryBlock saved;p->getStateInformation(saved);set(*p,gboy::parameterId(2,"tune"),-12);p->setStateInformation(saved.getData(),int(saved.getSize()));settle(*p);
   const float restoredTune=p->state.getRawParameterValue(gboy::parameterId(2,"tune"))->load();
  const float restoredAmount=p->state.getRawParameterValue(gboy::routeId(2,0,"amount"))->load();
- std::cerr<<"Tune saved/restored: "<<savedTune<<" / "<<restoredTune<<"; route: "<<savedAmount<<" / "<<restoredAmount<<"\n";
+ std::cerr<<std::setprecision(9)<<"Tune saved/restored: "<<savedTune<<" / "<<restoredTune<<"; route: "<<savedAmount<<" / "<<restoredAmount<<"\n";
  require(std::abs(restoredTune-savedTune)<.0002f&&std::abs(restoredTune-6)<.0002f,"layer state roundtrip");require(std::abs(restoredAmount-savedAmount)<.0001f&&std::abs(restoredAmount-.7f)<.0001f,"matrix state roundtrip");
  juce::AudioBuffer<float> buffer(2,256);juce::MidiBuffer midi;midi.addEvent(juce::MidiMessage::noteOn(1,60,.8f),64);p->processBlock(buffer,midi);
  require(buffer.getMagnitude(0,64)==0,"sample offset preceding note silent");require(buffer.getMagnitude(64,192)>0,"sample offset following note audible");
@@ -26,7 +27,8 @@ int main(){
  juce::XmlElement phase1("GBOY");auto* attack=phase1.createNewChildElement("PARAM");attack->setAttribute("id","attack");attack->setAttribute("value",.123);phase1.setAttribute("sampleSource","factory:1");juce::MemoryBlock legacy;juce::AudioProcessor::copyXmlToBinary(phase1,legacy);p->setStateInformation(legacy.getData(),int(legacy.getSize()));settle(*p);
  require(std::abs(p->state.getRawParameterValue("attack")->load()-.123f)<1e-5f,"Phase 1 attack migrated");
  for(int layer=1;layer<4;++layer)require(p->state.getRawParameterValue(gboy::parameterId(layer,"enabled"))->load()==0,"Phase 1 extra layers disabled");
- require(p->state.getRawParameterValue(gboy::routeId(2,0,"amount"))->load()==0,"old matrix does not leak into legacy state");
+ const float legacyAmount=p->state.getRawParameterValue(gboy::routeId(2,0,"amount"))->load();std::cerr<<"Legacy route amount: "<<legacyAmount<<"\n";
+ require(std::abs(legacyAmount)<.00001f,"old matrix does not leak into legacy state");
  p->requestSample("/a-missing-gboy-file.wav",2);settle(*p);require(p->status(2).startsWith("Cannot load"),"missing sample reported");
  // Decode a real mono WAV through the worker, into only layer 4.
  juce::TemporaryFile temporary(".wav");juce::WavAudioFormat format;auto stream=temporary.getFile().createOutputStream();require(stream!=nullptr,"temporary WAV stream");

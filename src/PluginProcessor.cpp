@@ -2,7 +2,7 @@
 #include "PluginEditor.h"
 juce::AudioProcessorValueTreeState::ParameterLayout GBoyProcessor::layout(){
  juce::AudioProcessorValueTreeState::ParameterLayout layout;
- layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{"volume",1},"Master volume",0.f,1.f,.65f));
+ layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{"volume",1},"Master volume",juce::NormalisableRange<float>(0.f,1.f,.0001f),.65f));
  for(int layer=0;layer<4;++layer){
   const auto title="Layer "+juce::String(layer+1)+" ";
   for(const auto& spec:gboy::layerSpecs){
@@ -14,7 +14,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout GBoyProcessor::layout(){
   for(int route=0;route<4;++route){
    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{gboy::routeId(layer,route,"source"),1},title+"Route "+juce::String(route+1)+" source",juce::StringArray{"Off","LFO","Envelope","Velocity","Mod wheel","Note","Macro"},0));
    layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID{gboy::routeId(layer,route,"target"),1},title+"Route "+juce::String(route+1)+" target",juce::StringArray{"Pitch","Cutoff","Gain","Pan","Grain position","Shape / FM index"},0));
-   layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{gboy::routeId(layer,route,"amount"),1},title+"Route "+juce::String(route+1)+" amount",-1.f,1.f,0.f));
+   layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{gboy::routeId(layer,route,"amount"),1},title+"Route "+juce::String(route+1)+" amount",juce::NormalisableRange<float>(-1.f,1.f),0.f));
   }
  }
  return layout;
