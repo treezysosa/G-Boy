@@ -1,8 +1,27 @@
-name: Build and test
+name: Release candidate validation
 on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+concurrency:
+  group: gboy-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
+  sanitizers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure sanitized core
+        run: cmake -S . -B build -DGBOY_BUILD_PLUGIN=OFF -DGBOY_SANITIZE=ON -DCMAKE_BUILD_TYPE=Debug
+      - name: Build and test
+        run: |
+          cmake --build build --parallel 4
+          ctest --test-dir build --output-on-failure
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          UBSAN_OPTIONS: halt_on_error=1
   plugin:
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -10,26 +29,75 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Configure Windows
+        if: runner.os == 'Windows'
+        run: cmake -S . -B build
+      - name: Configure universal macOS
+        if: runner.os == 'macOS'
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
       - name: Compile
         run: cmake --build build --config Release --parallel 4
-      - name: Tests
-        run: ctest --test-dir build -C Release --output-on-failure
-      - name: Generate factory audio
+      - name: Tests and release reliability
+        run: ctest --test-dir build -C Release --output-on-failure --output-junit validation/ctest.xml
+      - name: Generate content, native presets and benchmarks
         shell: bash
         run: |
           if [ -f build/Release/gboy_generate_content.exe ]; then
             build/Release/gboy_generate_content.exe
+            build/Release/gboy_benchmark.exe build/validation/benchmark.json
+            build/gboy_plugin_tests_artefacts/Release/gboy_plugin_tests.exe --export-presets "$GITHUB_WORKSPACE/factory-content"
           else
             build/gboy_generate_content
+            build/gboy_benchmark build/validation/benchmark.json
+            build/gboy_plugin_tests_artefacts/Release/gboy_plugin_tests --export-presets "$GITHUB_WORKSPACE/factory-content"
           fi
-      - uses: actions/upload-artifact@v4
+      - name: Stage Windows payload
+        if: runner.os == 'Windows'
+        run: python tools/release/stage.py --build build --output build/release-stage --platform windows
+      - name: Stage macOS payload
+        if: runner.os == 'macOS'
+        run: python3 tools/release/stage.py --build build --output build/release-stage --platform macos
+      - name: Validate Windows VST3
+        if: runner.os == 'Windows'
+        run: python tools/release/validate.py --platform windows --plugin "build/release-stage/VST3/G Boy.vst3" --output build/validation
+      - name: Validate universal VST3
+        if: runner.os == 'macOS'
+        run: python3 tools/release/validate.py --platform macos --plugin "build/release-stage/VST3/G Boy.vst3" --output build/validation
+      - name: Build Windows installer
+        if: runner.os == 'Windows'
+        run: installers/windows/build.ps1 -Stage "$env:GITHUB_WORKSPACE/build/release-stage" -Output "$env:GITHUB_WORKSPACE/build/installers"
+      - name: Windows install/uninstall smoke
+        if: runner.os == 'Windows'
+        run: installers/windows/smoke.ps1 -Installer "$env:GITHUB_WORKSPACE/build/installers/G-Boy-0.6.0-rc.1-Windows-Setup.exe" -Output "$env:GITHUB_WORKSPACE/build/validation"
+      - name: Build and install universal macOS package
+        if: runner.os == 'macOS'
+        run: |
+          bash installers/macos/build.sh "$GITHUB_WORKSPACE/build/release-stage" "$GITHUB_WORKSPACE/build/installers"
+          bash installers/macos/smoke.sh "$GITHUB_WORKSPACE/build/installers/G-Boy-0.6.0-rc.1-macOS.pkg" "$GITHUB_WORKSPACE/build/validation"
+      - name: Validate installed AU
+        if: runner.os == 'macOS'
+        run: python3 tools/release/validate.py --platform macos --plugin "/Library/Audio/Plug-Ins/Components/G Boy.component" --output build/validation --au
+      - name: Finalize Windows release candidate
+        if: runner.os == 'Windows'
+        run: python tools/release/finalize.py --stage build/release-stage --validation build/validation --installer build/installers/G-Boy-0.6.0-rc.1-Windows-Setup.exe --output dist --platform windows
+      - name: Finalize macOS release candidate
+        if: runner.os == 'macOS'
+        run: python3 tools/release/finalize.py --stage build/release-stage --validation build/validation --installer build/installers/G-Boy-0.6.0-rc.1-macOS.pkg --output dist --platform macos
+      - name: Upload candidate
+        uses: actions/upload-artifact@v4
         with:
-          name: G-Boy-${{ matrix.os }}
+          name: G-Boy-0.6.0-rc.1-${{ runner.os }}
           if-no-files-found: error
+          path: dist/
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: G-Boy-validation-${{ runner.os }}
+          if-no-files-found: warn
           path: |
-            build/GBoy_artefacts/Release/
-            factory-content/
-            README.md
-            LICENSE
+            build/validation/*.json
+            build/validation/*.xml
+            build/validation/*.log
+            build/validation/*.txt
+            build/validation/*.png

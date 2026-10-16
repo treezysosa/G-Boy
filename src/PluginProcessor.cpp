@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "presets/FactoryPatches.h"
+#include "presets/StateMigration.h"
 juce::AudioProcessorValueTreeState::ParameterLayout GBoyProcessor::layout(){
  juce::AudioProcessorValueTreeState::ParameterLayout layout;
  layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID{"volume",1},"Master volume",juce::NormalisableRange<float>(0.f,1.f,.0001f),.65f));
@@ -108,7 +109,7 @@ void GBoyProcessor::loadLoop(){
    if(!render)continue;
    try{
     if(load){
-     if(assetId.isNotEmpty()){library.waitUntilIdle(5000);const auto entry=library.find(assetId);if(entry.id.isNotEmpty()&&juce::File(entry.path).existsAsFile())next=entry.path;}
+     if(assetId.isNotEmpty()){for(int attempt=0;attempt<250&&!quit.load()&&!library.waitUntilIdle(20);++attempt){}const auto entry=library.find(assetId);if(entry.id.isNotEmpty()&&juce::File(entry.path).existsAsFile())next=entry.path;}
      std::unique_ptr<gboy::Sample> source;
      if(next=="vocal:0")source=std::make_unique<gboy::Sample>(gboy::vocal::syntheticPhrase());
      else if(next.startsWith("factory:")){int kind=next.substring(8).getIntValue();if(kind>=0&&kind<4)source=std::make_unique<gboy::Sample>(gboy::factory(kind));}
@@ -160,6 +161,7 @@ void GBoyProcessor::renderSegment(float* left,float* right,int count,double beat
  int cursor=0;for(int i=0;i<count;++i){const auto events=sequencer.tick(beat+i*increment,true);if(events.count){engine.render(left+cursor,right+cursor,i-cursor);applyEvents(events);cursor=i;}}engine.render(left+cursor,right+cursor,count-cursor);
 }
 void GBoyProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiBuffer& midi){
+ const auto callbackStart=juce::Time::getHighResolutionTicks();
  juce::ScopedNoDenormals noDenormals;
  for(size_t layer=0;layer<4;++layer){auto& slot=slots[layer];if(slot.retired.load()==nullptr){if(auto* sample=slot.pending.exchange(nullptr)){auto* old=slot.active;slot.active=sample;engine.layers[layer].setSample(sample);slot.retired.store(old);}}}
  readParameters();const auto& config=sequencer.configuration();clockTempo=config.tempo;clockBeat=internalBeat;clockRunning=config.run;
@@ -175,23 +177,21 @@ void GBoyProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiBuff
   const auto message=meta.getMessage();if(message.isNoteOn())inputNote(message.getNoteNumber(),message.getFloatVelocity(),message.getChannel());else if(message.isNoteOff())inputNote(message.getNoteNumber(),0,message.getChannel());else if(message.isPitchWheel())engine.bend(message.getChannel(),float(message.getPitchWheelValue()-8192)/8192.f);else if(message.isController()&&message.getControllerNumber()==1)engine.wheel(message.getChannel(),float(message.getControllerValue())/127);else if(message.isAllNotesOff()||message.isAllSoundOff()){sequencer.clearInput(message.getChannel());engine.allOff(message.getChannel());if(message.isAllSoundOff())engine.resetEffects();}
  }
  renderSegment(buffer.getWritePointer(0)+cursor,buffer.getWritePointer(1)+cursor,buffer.getNumSamples()-cursor,clockBeat+cursor*increment);internalBeat+=buffer.getNumSamples()*increment;
- mixPreview(buffer);playingStep.store(sequencer.step());playingBank.store(sequencer.bank());meter.store(buffer.getMagnitude(0,buffer.getNumSamples()));midi.clear();
+ mixPreview(buffer);
+ if(buffer.getNumSamples()>0){const double seconds=juce::Time::highResolutionTicksToSeconds(juce::Time::getHighResolutionTicks()-callbackStart);const float load=float(seconds*processingRate/buffer.getNumSamples());cpuLoad.store(cpuLoad.load()*.95f+load*.05f);cpuPeak.store(std::max(cpuPeak.load(),load));}int count=0;for(const auto& layer:engine.layers)count+=layer.activeVoices();voiceCount.store(count);
+ playingStep.store(sequencer.step());playingBank.store(sequencer.bank());meter.store(buffer.getMagnitude(0,buffer.getNumSamples()));midi.clear();
 }
 void GBoyProcessor::getStateInformation(juce::MemoryBlock& block){
- auto tree=state.copyState();tree.setProperty("version",5,nullptr);
+ auto tree=state.copyState();tree.setProperty("version",gboy::presets::stateVersion,nullptr);
  {std::lock_guard lock(mutex);for(int i=0;i<4;++i){const auto& slot=slots[size_t(i)];const auto suffix=juce::String(i+1);tree.setProperty("sampleSource"+suffix,slot.source,nullptr);tree.setProperty("sampleAsset"+suffix,slot.asset,nullptr);tree.setProperty("sampleRoot"+suffix,slot.publishedRoot,nullptr);}}
  auto xml=tree.createXml();copyXmlToBinary(*xml,block);
 }
-void GBoyProcessor::setStateInformation(const void* data,int size){
- if(size<=0||size>1024*1024)return;
- if(auto xml=getXmlFromBinary(data,size)){auto input=juce::ValueTree::fromXml(*xml);if(!input.hasType("GBOY"))return;
-  // Start from defaults, so Phase 1 state cannot inherit stale Phase 2 settings.
-  auto migrated=defaults.createCopy();
-  for(int i=0;i<input.getNumChildren();++i){auto child=input.getChild(i);auto target=migrated.getChildWithProperty("id",child.getProperty("id"));if(target.isValid()&&child.hasProperty("value"))target.setProperty("value",child.getProperty("value"),nullptr);}
-  state.replaceState(migrated);
-  for(int i=0;i<4;++i){auto fallback=i==0?input.getProperty("sampleSource","factory:0").toString():"factory:"+juce::String(i);const auto suffix=juce::String(i+1);requestSample(input.getProperty("sampleSource"+suffix,fallback).toString(),i,int(input.getProperty("sampleRoot"+suffix,60)),input.getProperty("sampleAsset"+suffix).toString());}
-  panicRequested.store(true);
- }
+void GBoyProcessor::setStateInformation(const void* data,int size){restoreState(data,size);}
+bool GBoyProcessor::restoreState(const void* data,int size){
+ if(!data||size<=0||size>1024*1024)return false;auto xml=getXmlFromBinary(data,size);if(!xml)return false;auto migrated=gboy::presets::migrateState(*xml,defaults,state);if(!migrated.isValid())return false;
+ const auto input=juce::ValueTree::fromXml(*xml);state.replaceState(migrated);
+ for(int i=0;i<4;++i){const auto suffix=juce::String(i+1);auto fallback=i==0?input.getProperty("sampleSource","factory:0").toString():"factory:"+juce::String(i);const double root=double(input.getProperty("sampleRoot"+suffix,60));requestSample(input.getProperty("sampleSource"+suffix,fallback).toString(),i,std::isfinite(root)?int(std::clamp(root,0.,127.)):60,input.getProperty("sampleAsset"+suffix).toString());}
+ panicRequested.store(true);return true;
 }
 juce::AudioProcessorEditor* GBoyProcessor::createEditor(){return new GBoyEditor(*this);}
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter(){return new GBoyProcessor();}
@@ -294,7 +294,7 @@ bool GBoyProcessor::loadLibraryEntry(const juce::String& id,int layer){
  juce::MemoryBlock block;const juce::File file(entry.path);if(file.getSize()>1024*1024||!file.loadFileAsData(block))return false;auto xml=getXmlFromBinary(block.getData(),int(block.getSize()));if(!xml||!xml->hasTagName("GBOY"))return false;
  // Pack exports use relative references; bind them to this installed library's stable IDs.
  const auto snapshot=library.snapshot();for(int i=1;i<=4;++i){const auto suffix=juce::String(i);const auto relative=xml->getStringAttribute("sampleRelative"+suffix);if(relative.isNotEmpty()){bool found=false;for(const auto& sample:snapshot.entries)if(sample.libraryId==entry.libraryId&&sample.relative==relative&&sample.kind=="sample"){xml->setAttribute("sampleSource"+suffix,sample.path);xml->setAttribute("sampleAsset"+suffix,sample.id);found=true;break;}if(!found)return false;}}
- copyXmlToBinary(*xml,block);setStateInformation(block.getData(),int(block.getSize()));return true;
+ copyXmlToBinary(*xml,block);return restoreState(block.getData(),int(block.getSize()));
 }
 bool GBoyProcessor::saveLibraryPatch(juce::File file){juce::MemoryBlock block;getStateInformation(block);file=file.withFileExtension("gboy");if(!file.replaceWithData(block.getData(),block.getSize()))return false;library.importFiles({file});return true;}
 void GBoyProcessor::previewLibraryEntry(const juce::String& id){std::lock_guard lock(mutex);previewRequest=id;previewRequestGeneration=++previewGeneration;previewBusy.store(true);previewStop.store(true);}

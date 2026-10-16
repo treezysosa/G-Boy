@@ -1,6 +1,6 @@
 #include "PluginEditor.h"
 GBoyEditor::GBoyEditor(GBoyProcessor& processor):AudioProcessorEditor(processor),p(processor),keys(p.keyboard,juce::MidiKeyboardComponent::horizontalKeyboard),grid(p){
- setLookAndFeel(&look);look.setColour(juce::Slider::rotarySliderFillColourId,juce::Colour(0xff99e8ce));look.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff4b386e));look.setColour(juce::TextButton::buttonOnColourId,juce::Colour(0xff24675f));
+ addAndMakeVisible(performanceLabel);performanceLabel.setFont(11);performanceLabel.setTooltip("Smoothed audio-callback time / buffer duration. Peak and benchmark reports are available in release validation logs.");setLookAndFeel(&look);look.setColour(juce::Slider::rotarySliderFillColourId,juce::Colour(0xff99e8ce));look.setColour(juce::TextButton::buttonColourId,juce::Colour(0xff4b386e));look.setColour(juce::TextButton::buttonOnColourId,juce::Colour(0xff24675f));
  for(size_t i=0;i<knobs.size();++i){auto& slider=knobs[i];slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);slider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,84,20);slider.setNumDecimalPlacesToDisplay(i==6||i==7?1:3);addAndMakeVisible(slider);labels[i].setText(gboy::layerSpecs[i].label,juce::dontSendNotification);labels[i].setJustificationType(juce::Justification::centred);addAndMakeVisible(labels[i]);}
  for(int i=0;i<4;++i){auto& button=layerButtons[size_t(i)];button.setButtonText("LAYER "+juce::String(i+1));button.onClick=[this,i]{selectLayer(i);};addAndMakeVisible(button);}
  generator.addItemList({"Sampler","Virtual analog","Wavetable","FM","Granular","Vocal"},1);filter.addItemList({"Bypass","Low pass","Band pass","High pass"},1);
@@ -67,7 +67,7 @@ void GBoyEditor::setPage(int next){
 void GBoyEditor::paint(juce::Graphics& g){
  const float w=float(getWidth()),h=float(getHeight());g.fillAll(juce::Colour(modern?0xff181e2b:0xff35244f));g.setColour(juce::Colour(modern?0xff26334a:0xff756099));g.fillRoundedRectangle(12,12,w-24,h-24,40);
  g.setColour(juce::Colour(0xff151d29));g.fillRoundedRectangle(35,58,w-70,116,16);
- g.setColour(juce::Colour(0xffa5eac5));g.setFont(26);g.drawText("G BOY",40,14,170,38,juce::Justification::centredLeft);g.setFont(14);g.drawText("PHASE 05 / LIBRARY",225,20,300,28,juce::Justification::centredLeft);
+ g.setColour(juce::Colour(0xffa5eac5));g.setFont(26);g.drawText("G BOY",40,14,170,38,juce::Justification::centredLeft);g.setFont(14);g.drawText("0.6.0 RC1",225,20,300,28,juce::Justification::centredLeft);
  g.setFont(16);g.drawText("L"+juce::String(selectedLayer+1)+" / "+(p.isBusy(selectedLayer,false)?"RENDERING / LOADING...":p.status(selectedLayer)),55,65,int(w)-110,24,juce::Justification::centredLeft);
  juce::Path path;for(int i=0;i<128;++i){const float x=55+float(i)*(w-110)/127,y=126-p.waveform[size_t(selectedLayer)][size_t(i)].load()*28;if(i==0)path.startNewSubPath(x,y);else path.lineTo(x,y);}g.strokePath(path,juce::PathStrokeType(2));
  if(showVocals){const auto info=p.sliceInfo(selectedLayer);g.setColour(juce::Colour(0xffd7bfff));g.setFont(10);for(int i=0;i<info.count;++i){const float x=55+float(info.edges[size_t(i)])*(w-110);g.drawVerticalLine(int(x),94,153);g.drawText(juce::String(60+i),int(x)+2,137,28,16,juce::Justification::centredLeft);}g.setFont(16);g.drawText(juce::String(info.count)+" slices / "+juce::String(info.seconds,2)+" s   |   "+(info.count>0?"MIDI 60-"+juce::String(59+info.count):"Whole phrase, chromatic"),40,602,int(w)-80,28,juce::Justification::centredLeft);}
@@ -76,6 +76,7 @@ void GBoyEditor::paint(juce::Graphics& g){
 }
 void GBoyEditor::resized(){
  const int w=getWidth(),h=getHeight(),area=w-80,col=area/5;
+ performanceLabel.setBounds(315,20,w-825,28);
  if(browser)browser->setBounds(40,225,w-80,510);
  for(int i=0;i<4;++i)layerButtons[size_t(i)].setBounds(40+i*125,185,115,28);
  browserPage.setBounds(w-495,20,90,28);hybridPage.setBounds(w-400,20,80,28);vocalPage.setBounds(w-310,20,80,28);effectsPage.setBounds(w-220,20,80,28);sequencePage.setBounds(w-130,20,90,28);
@@ -113,7 +114,7 @@ void GBoyEditor::choose(int action){
   else if(action==4)success=safe->p.saveRack(file.withFileExtension("gbfx"),targetRack);
   else if(action==5)success=safe->p.loadRack(file,targetRack);
   else if(action==6)success=safe->p.exportSequence(file.withFileExtension("mid"));
-  else{juce::MemoryBlock block;success=file.getSize()<1024*1024&&file.loadFileAsData(block);if(success)safe->p.setStateInformation(block.getData(),int(block.getSize()));}
+  else{juce::MemoryBlock block;success=file.getSize()<1024*1024&&file.loadFileAsData(block);if(success)success=safe->p.restoreState(block.getData(),int(block.getSize()));}
   if(!success)juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon,"Operation unavailable","Check the file and destination. Slice export requires completed slicing; rack files must use the GBFX format.");
  });
 }

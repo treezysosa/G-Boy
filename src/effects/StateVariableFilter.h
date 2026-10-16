@@ -5,12 +5,17 @@
 namespace gboy {
 class StateVariableFilter {
  float ic1=0,ic2=0,g=0,k=1,a1=1,a2=0,a3=0;
+ float lastCutoff=-1,lastResonance=-1;double lastRate=-1;
 public:
  void reset(){ic1=ic2=0;}
  void configure(float cutoff,float resonance,double rate){
-  g=std::tan(float(std::numbers::pi)*std::clamp(cutoff,20.f,float(rate*.45))/float(rate));
+  cutoff=std::clamp(cutoff,20.f,float(rate*.45));resonance=std::clamp(resonance,0.f,1.f);
+  if(cutoff==lastCutoff&&resonance==lastResonance&&rate==lastRate)return;
+  lastCutoff=cutoff;lastResonance=resonance;lastRate=rate;
+  g=std::tan(float(std::numbers::pi)*cutoff/float(rate));
   k=2-1.9f*std::clamp(resonance,0.f,1.f);a1=1/(1+g*(g+k));a2=g*a1;a3=g*a2;
  }
+ void copyCoefficientsFrom(const StateVariableFilter& other){g=other.g;k=other.k;a1=other.a1;a2=other.a2;a3=other.a3;lastCutoff=other.lastCutoff;lastResonance=other.lastResonance;lastRate=other.lastRate;}
  float process(float input,int mode){
   if(mode==0)return input;
   const float v3=input-ic2,v1=a1*ic1+a2*v3,v2=ic2+a2*ic1+a3*v3;

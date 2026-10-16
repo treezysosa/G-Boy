@@ -1,0 +1,21 @@
+G Boy release-candidate binary distribution
+
+The original G Boy source is MIT licensed (LICENSE). Original generated factory
+sounds and preset settings are CC0-1.0, as recorded in their provenance manifests.
+
+The automated open-source build links JUCE 8.0.6 under AGPLv3 and the JUCE-bundled
+VST3 SDK under GPLv3. These combined binaries are distributed under the applicable
+AGPLv3/GPLv3 terms, not solely MIT. Full license texts are supplied as AGPL-3.0.txt
+and GPL-3.0.txt. Additional dependency notices are in Documentation/ThirdParty and
+THIRD-PARTY.md. No warranty is provided.
+
+Corresponding source accompanies the binaries in Source.tar.gz: G Boy plus the
+complete pinned JUCE source and build scripts. Build using CMake 3.22 or newer:
+  cmake -S G-Boy -B build -DJUCE_SOURCE_DIR=<absolute path to extracted JUCE>
+  cmake --build build --config Release
+The exact source commit is recorded in BUILD-INFO.json. Public repository:
+https://github.com/treezysosa/G-Boy
+
+Commercial JUCE license holders may make separately licensed builds under their
+applicable JUCE/SDK agreements. This automated artifact makes no claim to such a
+commercial license. User-imported recordings retain their own supplied licenses.

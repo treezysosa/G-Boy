@@ -41,7 +41,7 @@ class Slot {
    case Type::FilterSweep:cutoff=value[0]*std::exp2(value[1]*float(std::sin(tau*phase)));break;
    default:break;
   }
-  for(auto& filter:low)filter.configure(cutoff,params.type==Type::FilterSweep?.4f:0.f,rate);
+  low[0].configure(cutoff,params.type==Type::FilterSweep?.4f:0.f,rate);low[1].copyCoefficientsFrom(low[0]);
   if(params.type==Type::Convolution){uint32_t seed=72;for(size_t i=0;i<64;++i){seed=seed*1664525u+1013904223u;const double time=(double(i)+1)/64*value[0]*.001;irDelay[i]=size_t(std::max(1.,time*rate));irGain[i]=float((double(seed)/4294967295.*2-1)*std::exp(-time/(value[1]*.001))*.18);}}
  }
  std::array<float,2> shifted(float pitch){

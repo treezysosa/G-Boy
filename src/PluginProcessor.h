@@ -25,6 +25,9 @@ public:
  void changeProgramName(int,const juce::String&) override {}
  void getStateInformation(juce::MemoryBlock&) override;
  void setStateInformation(const void*,int) override;
+ bool restoreState(const void*,int);
+ std::atomic<float> cpuLoad{0},cpuPeak{0};std::atomic<int> voiceCount{0};
+ void resetPerformancePeak(){cpuPeak.store(0);}
  struct SliceInfo { std::array<double,33> edges{};int count=0;double seconds=0; };
  bool isBusy(int layer,bool includePublication=true) const;
  SliceInfo sliceInfo(int layer) const;

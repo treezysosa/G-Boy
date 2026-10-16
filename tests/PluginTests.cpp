@@ -65,4 +65,6 @@ int runTests(){
  p.reset();libraryHome.getFile().deleteRecursively();
  return 0;
 }
-int main(){try{return runTests();}catch(const std::exception& error){std::cerr<<"FAIL processor: "<<error.what()<<std::endl;return 1;}}
+int runReleaseTests(const juce::File&);
+int exportFactoryPresets(const juce::File&);
+int main(int argc,char** argv){try{if(argc>1&&juce::String(argv[1])=="--release")return runReleaseTests(juce::File::getCurrentWorkingDirectory().getChildFile(argc>2?argv[2]:"validation"));if(argc>2&&juce::String(argv[1])=="--export-presets")return exportFactoryPresets(juce::File(argv[2]));return runTests();}catch(const std::exception& error){std::cerr<<"FAIL processor: "<<error.what()<<std::endl;return 1;}}

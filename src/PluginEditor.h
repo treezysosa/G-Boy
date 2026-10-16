@@ -58,7 +58,7 @@ private:
  juce::TextButton seqExport{"EXPORT PATTERN MIDI"},seqRandom{"RANDOMIZE BANK"};
  juce::Label seqStateLabel,stepTitle,seqHelp;int selectedStep=0;
  void bindStep(int);void refreshSequence();
- juce::Slider master;juce::Label masterLabel;std::unique_ptr<SliderAttachment> masterAttachment;
+ juce::Slider master;juce::Label performanceLabel;juce::Label masterLabel;std::unique_ptr<SliderAttachment> masterAttachment;
  std::array<juce::TextButton,4> layerButtons;
  juce::ToggleButton enabled{"Layer enabled"};
  std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> enableAttachment;
@@ -71,5 +71,5 @@ private:
  std::array<std::unique_ptr<SliderAttachment>,4> amountAttachments;
  juce::TextButton import{"IMPORT"},save{"SAVE"},load{"LOAD"},preview{"A / PLAY"},panic{"B / STOP"},mode{"RETRO / MODERN"};
  std::unique_ptr<juce::FileChooser> chooser;bool modern=false;int selectedLayer=0;
- void selectLayer(int);void choose(int);void timerCallback() override {updateEffectLabels();refreshSequence();grid.repaint();repaint();}
+ void selectLayer(int);void choose(int);void timerCallback() override {performanceLabel.setText("CPU "+juce::String(p.cpuLoad.load()*100,1)+"% / "+juce::String(p.voiceCount.load())+" voices",juce::dontSendNotification);updateEffectLabels();refreshSequence();grid.repaint();repaint();}
 };

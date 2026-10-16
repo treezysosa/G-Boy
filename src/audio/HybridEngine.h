@@ -44,7 +44,7 @@ class LayerEngine {
   const float cutoff=std::clamp(params.cutoff*std::exp2(std::clamp(mods[1]*4,-8.f,8.f)),20.f,float(rate*.45));
   v.cutoff+=(cutoff-v.cutoff)*smoothing;
   v.leftPan=std::sqrt((1-v.pan)*.5f);v.rightPan=std::sqrt((1+v.pan)*.5f);
-  for(auto& filter:v.filter)filter.configure(v.cutoff,params.resonance,rate);
+  if(params.filter!=0){v.filter[0].configure(v.cutoff,params.resonance,rate);v.filter[1].copyCoefficientsFrom(v.filter[0]);}
  }
 public:
  LayerParameters params;

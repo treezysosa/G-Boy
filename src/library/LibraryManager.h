@@ -29,7 +29,7 @@ public:
  void favorite(juce::String id,bool);void exportLibrary(juce::String libraryId,juce::File destination);
  bool waitUntilIdle(int milliseconds=30000) const;
 private:
- juce::File home;mutable std::mutex mutex;mutable std::condition_variable changed;Snapshot view;std::deque<std::function<void()>> jobs;bool quitting=false;std::thread worker;
+ juce::File home;mutable std::mutex mutex;mutable std::condition_variable changed;Snapshot view;std::deque<std::function<void()>> jobs;std::atomic<bool> quitting{false};std::thread worker;
  // The worker alone owns the mutable index. Audio processing never calls this manager.
  Snapshot index;void enqueue(std::function<void()>);void run();void publish();void persist();void restore();
  void indexFolder(const Root&);void readPack(juce::File,bool install);Entry decode(juce::File,const Root&,juce::String relative,const Entry* metadata=nullptr);
