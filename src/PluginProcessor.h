@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_audio_utils/juce_audio_utils.h>
-#include "audio/Engine.h"
+#include "audio/HybridEngine.h"
+#include "audio/ParameterSpecs.h"
 #include <thread>
 #include <mutex>
 class GBoyProcessor final : public juce::AudioProcessor, private juce::MidiKeyboardStateListener {
@@ -20,20 +21,34 @@ public:
  void changeProgramName(int,const juce::String&) override {}
  void getStateInformation(juce::MemoryBlock&) override;
  void setStateInformation(const void*,int) override;
- void requestSample(juce::String source);
- juce::String status();
+ void loadHybridPreset(int preset);
+ void requestSample(juce::String source,int layer=0);
+ juce::String status(int layer=0);
  juce::AudioProcessorValueTreeState state;
  juce::MidiKeyboardState keyboard;
- std::array<std::atomic<float>,128> waveform{};
+ std::array<std::array<std::atomic<float>,128>,4> waveform{};
  std::atomic<float> meter{0};
  std::atomic<bool> panicRequested{false};
 private:
  static juce::AudioProcessorValueTreeState::ParameterLayout layout();
- gboy::Engine engine;
- gboy::Sample* active=nullptr;
- std::atomic<gboy::Sample*> pending{nullptr}, retired{nullptr};
+ gboy::HybridEngine engine;
+ struct SampleSlot {
+  gboy::Sample* active=nullptr;
+  std::atomic<gboy::Sample*> pending{nullptr},retired{nullptr};
+  juce::String requested,source="factory:0",message="CHIP PULSE";bool hasRequest=false;
+ };
+ std::array<SampleSlot,4> slots;
+ struct Handles {
+  std::array<std::atomic<float>*,15> values{};
+  std::atomic<float>* enabled=nullptr;std::atomic<float>* generator=nullptr;std::atomic<float>* filter=nullptr;
+  std::array<std::array<std::atomic<float>*,3>,4> routes{};
+ };
+ std::array<Handles,4> handles;
+ std::atomic<float>* master=nullptr;
+ juce::ValueTree defaults;
+ void readParameters();
  std::atomic<bool> quit{false};
- std::mutex mutex; juce::String requested, source="factory:0", message="CHIP PULSE"; bool hasRequest=false;
+ std::mutex mutex;
  std::thread worker;
  struct KeyEvent { int note=60, channel=1; float velocity=0; };
  juce::AbstractFifo keyFifo{256}; std::array<KeyEvent,256> keyEvents{};

@@ -1,4 +1,5 @@
 #include "audio/Engine.h"
+#include "audio/HybridEngine.h"
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -11,4 +12,11 @@ void wav(const std::filesystem::path& path,const std::vector<float>& l,const std
 int main(int argc,char** argv){auto dest=std::filesystem::path(argc>1?argv[1]:"factory-content/samples");std::filesystem::create_directories(dest);const char* names[]={"Chip Pulse","Soft Keys","FM Bell","Arcade Drum"};
  for(int k=0;k<4;++k){auto s=gboy::factory(k);wav(dest/(std::string(names[k])+".wav"),s.left,s.right,44100);}
  auto s=gboy::factory(1);gboy::Engine engine;engine.prepare(48000);engine.setSample(&s);std::vector<float> l(48000*3),r(l.size());for(int n:{60,64,67})engine.noteOn(n,.8f);engine.render(l.data(),r.data(),48000);for(int n:{60,64,67})engine.noteOff(n);engine.render(l.data()+48000,r.data()+48000,96000);wav(dest/"../Phase1-Demo.wav",l,r,48000);
+ gboy::HybridEngine hybrid;hybrid.prepare(48000);
+ for(int layer=0;layer<4;++layer){auto& engine=hybrid.layers[size_t(layer)];engine.setSample(&s);engine.params.enabled=true;engine.params.generator=gboy::Generator(layer+1);engine.params.level=.5f;engine.params.attack=.1f;engine.params.release=.7f;engine.params.filter=1;engine.params.cutoff=5000;engine.params.tune=layer==1?12.f:0.f;engine.params.routes[0]={gboy::ModSource::Lfo,gboy::ModTarget::Shape,.3f};}
+ for(int note:{60,64,67}){hybrid.noteOn(note,.8f);}
+ hybrid.render(l.data(),r.data(),48000);
+ for(int note:{60,64,67}){hybrid.noteOff(note);}
+ hybrid.render(l.data()+48000,r.data()+48000,96000);wav(dest/"../Phase2-Demo.wav",l,r,48000);
+
 }

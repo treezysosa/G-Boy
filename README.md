@@ -1,8 +1,27 @@
-# G Boy — Phase 1 (0.1.0)
+# G Boy — Phase 2 (0.2.0)
 
-A C++20 sample instrument with a JUCE 8 interface. Source foundation, not a validated production release. Windows VST3/Standalone and macOS VST3/AU/Standalone targets are configured. No Windows or macOS binary has been built in the supplied Linux workspace.
+A C++20 sample instrument with a JUCE 8 interface. Source foundation, not a validated production release. Windows VST3/Standalone and macOS VST3/AU/Standalone targets are configured. Phase 1 compiled and passed its tests on GitHub Windows and macOS runners. Phase 2 adds the hybrid engine described below; see docs/VALIDATION.md for its build status.
 
 Implemented: 64-voice stereo sampler, linear interpolation, MIDI note-on/off and channel-aware release, oldest-voice stealing, ADSR, smoothed master gain, soft output limiting, four original generated sounds, on-screen keyboard, hold-to-preview A button, B panic, sample drag/drop and asynchronous decoding, factory selector, save/load `.gboy` presets and host project state, resizable handheld-style GUI, waveform and output meter, modern/retro palettes. Parameters are exposed to DAW automation. Imported samples use MIDI 60 as root. WAV/AIFF/FLAC support comes from JUCE's basic format readers.
+
+
+## Phase 2 hybrid instrument
+
+Use LAYER 1–4 to edit a layer, enable it, and choose Sampler, Virtual analog, Wavetable, FM or Granular. Each layer has its own sample import, ADSR, level/pan/tuning, filter, LFO, macro and four modulation routes. Only layer 1 is enabled initially. There are 64 voices per layer (up to 256 layer voices for 64 played notes); dense patches cost more CPU and no adaptive CPU governor is implemented.
+
+- **Virtual analog:** continuous sine → PolyBLEP saw → PolyBLEP pulse morph.
+- **Wavetable:** three original frames with interpolation and six harmonic-limited mip levels. User wavetable import is not implemented.
+- **FM:** two sine operators, ratio control and shape/index control. No oversampling; high modulation indices and high notes can alias.
+- **Granular:** four overlapping Hann-window grains per voice, position and grain size controls; pitch follows MIDI. This is not a full time-stretch or vocal formant engine.
+- **Filter:** per-voice stereo topology-preserving state variable filter with bypass/LP/BP/HP modes and resonance.
+- **Modulation:** four source/destination/bipolar-amount rows per layer. Sources: LFO, ADSR, velocity, CC1 mod wheel, note, macro. Targets: pitch (12 semitones per unit), cutoff (4 octaves), gain, pan, grain position and oscillator shape/FM index. Control rate is one update per 16 samples with smoothing. The LFO is free-running in Hz; there is no tempo sync or drag/drop routing yet.
+- **MIDI:** per-channel ±2-semitone pitch bend and CC1. Hardware MIDI uses sample offsets; on-screen keys are queued for the next audio block.
+
+The VA/WT/FM shape control affects those modes; FM ratio affects FM, grain controls affect Granular, and cutoff/resonance require an enabled filter. This keeps a single compact panel while retaining separate parameter values for every layer.
+
+The Hybrid patches menu loads four original configurations: Handheld Stack, Glacier Grains, Indigo Bass and FM Prism. It replaces the entire patch. The factory-sample menu and IMPORT affect only the selected layer. SAVE/LOAD applies to all four layers. Phase 1 `.gboy` presets migrate with extra layers disabled and new parameters reset to defaults; the original parameter IDs and plugin ID remain unchanged. Sample paths are not embedded or relocated automatically.
+
+A reference sampler remains in `src/audio/Engine.h` for Phase 1 regression checks; `src/audio/HybridEngine.h` is the live plugin engine. Listen to `factory-content/Phase2-Demo.wav` for a real offline four-layer render.
 
 ## Windows build
 
@@ -60,12 +79,12 @@ g++ -std=c++20 -O2 -Isrc tools/GenerateContent.cpp -o /tmp/gboy-generate
 
 ## State and threading
 
-One background loader decodes samples and publishes a pending immutable buffer. The callback swaps it at a block boundary and retires the previous buffer for worker deletion. No sample decoding, buffer destruction, or engine allocation occurs in rendering. UI notes use a fixed-capacity SPSC queue; overflow requests panic. MIDI supplied by the DAW is rendered at its sample offsets. GUI and host state use JUCE services; their realtime behavior still requires host validation.
+One background loader decodes samples and publishes a pending immutable buffer for each of the four independent layers. The callback swaps it at a block boundary and retires the previous buffer for worker deletion. No sample decoding, buffer destruction, or engine allocation occurs in rendering. UI notes use a fixed-capacity SPSC queue; overflow requests panic. MIDI supplied by the DAW is rendered at its sample offsets. GUI and host state use JUCE services; their realtime behavior still requires host validation.
 
-Presets store parameter values and an absolute user sample path, not embedded audio. Keep samples in place when reopening projects. Missing or invalid samples retain the previous sound and show an error. Loading is limited to 30 seconds and stereo output to bound memory. Saving while a sample request is pending captures the last successfully decoded source. Sample changes stop current voices and can click; parameter changes other than master gain are not fully smoothed yet.
+Presets store all four layers, their matrix routes, and absolute user sample paths, not embedded audio. Keep samples in place when reopening projects. Missing or invalid samples retain the previous sound and show an error. Loading is limited to 30 seconds and stereo output to bound memory. Saving while a sample request is pending captures the last successfully decoded source for that layer. Sample changes stop current voices and can click; gain, tuning, cutoff, pan, shape and modulation transitions are smoothed. Generator/filter changes, enable switching and envelope-time edits are not fully click-free yet.
 
 ## Validation and scope
 
-See [validation](docs/VALIDATION.md) for actual test results and remaining checks. Later phases (four layers, vocal workstation, FX, sequencer, searchable libraries) are not implemented or displayed as working controls. MIDI 2.0, sustain pedal, pitch bend, looping, streaming, root detection, custom root selection, CLAP, AAX, GPU rendering, undo, MIDI learn, installers and release signing are not included. Pro Tools support needs AAX and its licensed SDK; VST3 does not provide native Pro Tools support.
+See [validation](docs/VALIDATION.md) for actual test results and remaining checks. Later phases (vocal workstation, full FX rack, sequencer, searchable libraries) are not implemented or displayed as working controls. MIDI 2.0, sustain pedal, looping, streaming, root detection, custom root selection, CLAP, AAX, GPU rendering, undo, MIDI learn, installers and release signing are not included. Pro Tools support needs AAX and its licensed SDK; VST3 does not provide native Pro Tools support.
 
 Before distribution, review JUCE's AGPLv3/commercial licensing requirements. Repository source is MIT; generated factory content is CC0-1.0. No Nintendo assets, game recordings or human vocal recordings are included.
