@@ -21,6 +21,7 @@ public:
  explicit LibraryManager(juce::File home=defaultHome());~LibraryManager();
  static juce::File defaultHome();
  static std::shared_ptr<LibraryManager> shared(juce::File home=defaultHome());
+ uint64_t revision() const;
  Snapshot snapshot() const;Entry find(const juce::String&) const;
  void importFiles(std::vector<juce::File>);void scanFolder(juce::File);void installPack(juce::File);
  void relocate(juce::String libraryId,juce::File folder);void rescan();

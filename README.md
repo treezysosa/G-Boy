@@ -1,9 +1,19 @@
-# G Boy — Phase 4 (0.4.0)
+# G Boy — Phase 5 (0.5.0)
 
 A C++20 sample instrument with a JUCE 8 interface. Source foundation, not a validated production release. Windows VST3/Standalone and macOS VST3/AU/Standalone targets are configured. Phase 1 compiled and passed its tests on GitHub Windows and macOS runners. Phase 2 hybrid builds also passed on both runners. Phase 3 also built successfully on Windows and macOS, with all five test suites passing on each. Phase 4 builds and all seven suites pass on Windows; macOS CI is pending. See docs/VALIDATION.md for download links and the scope of validation.
 
-Implemented: 64-voice stereo sampler, linear interpolation, MIDI note-on/off and channel-aware release, oldest-voice stealing, ADSR, smoothed master gain, soft output limiting, four original generated sounds, on-screen keyboard, hold-to-preview A button, B panic, sample drag/drop and asynchronous decoding, factory selector, save/load `.gboy` presets and host project state, resizable handheld-style GUI, waveform and output meter, modern/retro palettes. Parameters are exposed to DAW automation. Imported samples use MIDI 60 as root. WAV/AIFF/FLAC support comes from JUCE's basic format readers.
+Implemented: 64-voice stereo sampler, linear interpolation, MIDI note-on/off and channel-aware release, oldest-voice stealing, ADSR, smoothed master gain, soft output limiting, four original generated sounds, on-screen keyboard, hold-to-preview A button, B panic, sample drag/drop and asynchronous decoding, factory selector, save/load `.gboy` presets and host project state, resizable handheld-style GUI, waveform and output meter, modern/retro palettes. Parameters are exposed to DAW automation. Direct imports use MIDI 60 as root; browser loads apply editable analysed/declared root metadata. WAV/AIFF/FLAC support comes from JUCE's basic format readers.
 
+
+## Phase 5 library and browser
+
+**BROWSER** searches 29 real factory entries and imported content by name, category, type, library, tags, author, license and supplied cultural/language metadata. Favorites and user metadata persist. Batch import copies samples/presets/racks; Add Folder links existing content. Waveform thumbnails, root/tempo suggestions, silence bounds and onset analysis run in the background. Similarity sorts analysed samples by acoustic features; it is not an AI or semantic model.
+
+Load samples/FX into the selected layer, or load complete patches. Preview uses a separate player, preserving the current patch. Factory expansion adds Quiet Storm Keys, Velvet Night Pad, Cassette Bass, Neon Arcade, Haunted Glass and Bedroom Haze. All are original synthesis; generated textures are not recorded humans.
+
+Install folder packs with `gboy-library.json`; each asset requires license/provenance metadata and safe relative paths. Export user libraries after filling actual licensing metadata. Exported full patches require their samples to be bundled and use relative references. Relocate linked/installed libraries to recover moved files while retaining IDs, tags and favorites; project recall resolves sample IDs before falling back to saved paths. Rename recovery is explicit, not guessed.
+
+[Phase 5 documentation](docs/PHASE5.md) covers controls, manifest/sidecar schema, storage, preview behavior, analysis limits and portability. `factory-content/gboy-library.json` installs the twelve generated factory WAVs after running the content generator. Factory JSON preset descriptors are metadata; functional patch entries use built-in recipes or native `.gboy` files.
 
 ## Phase 4 effects and sequencer
 
@@ -121,10 +131,10 @@ g++ -std=c++20 -O2 -Isrc tools/GenerateContent.cpp -o /tmp/gboy-generate
 
 One background loader decodes samples and publishes a pending immutable buffer for each of the four independent layers. The callback swaps it at a block boundary and retires the previous buffer for worker deletion. No sample decoding, buffer destruction, or engine allocation occurs in rendering. UI notes use a fixed-capacity SPSC queue; overflow requests panic. MIDI supplied by the DAW is rendered at its sample offsets. GUI and host state use JUCE services; their realtime behavior still requires host validation.
 
-Presets store all four layers, their matrix routes, and absolute user sample paths, not embedded audio. Keep samples in place when reopening projects. Missing or invalid samples retain the previous sound and show an error. Loading is limited to 30 seconds and stereo output to bound memory. Saving while a sample request is pending captures the last successfully decoded source for that layer. Sample changes stop current voices and can click; gain, tuning, cutoff, pan, shape and modulation transitions are smoothed. Generator/filter changes, enable switching and envelope-time edits are not fully click-free yet.
+Presets store all four layers, their matrix routes, sample root notes, library asset IDs when available, and fallback absolute user sample paths, not embedded audio. Keep samples in place when reopening projects. Missing or invalid samples retain the previous sound and show an error. Loading is limited to 30 seconds and stereo output to bound memory. Saving while a sample request is pending captures the last successfully decoded source for that layer. Sample changes stop current voices and can click; gain, tuning, cutoff, pan, shape and modulation transitions are smoothed. Generator/filter changes, enable switching and envelope-time edits are not fully click-free yet.
 
 ## Validation and scope
 
-See [validation](docs/VALIDATION.md) for actual test results and remaining checks. Later phases (searchable libraries, installation, production validation) are not implemented or displayed as working controls. MIDI 2.0, sustain pedal, looping, streaming, root detection, custom root selection, CLAP, AAX, GPU rendering, undo, MIDI learn, installers and release signing are not included. Pro Tools support needs AAX and its licensed SDK; VST3 does not provide native Pro Tools support.
+See [validation](docs/VALIDATION.md) for actual test results and remaining checks. Phase 5 library/browser features are implemented; production validation and release packaging remain future work. MIDI 2.0, sustain pedal, looping, streaming, root detection, custom root selection, CLAP, AAX, GPU rendering, undo, MIDI learn, installers and release signing are not included. Pro Tools support needs AAX and its licensed SDK; VST3 does not provide native Pro Tools support.
 
 Before distribution, review JUCE's AGPLv3/commercial licensing requirements. Repository source is MIT; generated factory content is CC0-1.0. No Nintendo assets, game recordings or human vocal recordings are included.

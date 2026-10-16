@@ -205,6 +205,12 @@ void GBoyProcessor::loadHybridPreset(int preset){
  for(int layer=0;layer<4;++layer){const auto& p=recipe[size_t(layer)];set(layer,"enabled",p.enabled?1.f:0.f);set(layer,"generator",float(p.generator));set(layer,"filter",float(p.filter));const float values[]={p.attack,p.decay,p.sustain,p.release,p.level,p.pan,p.tune,p.cutoff,p.resonance,p.shape,p.ratio,p.position,p.grainSize,p.lfoRate,p.macro};for(size_t i=0;i<15;++i)set(layer,gboy::layerSpecs[i].id,values[i]);for(int row=0;row<4;++row){const auto& route=p.routes[size_t(row)];set(layer,"r"+std::to_string(row+1)+"_source",float(route.source));set(layer,"r"+std::to_string(row+1)+"_target",float(route.target));set(layer,"r"+std::to_string(row+1)+"_amount",route.amount);}}
  state.replaceState(tree);for(int layer=0;layer<4;++layer)requestSample("factory:"+juce::String(layer),layer);panicRequested.store(true);
 }
+bool GBoyProcessor::exportSlices(const juce::File& file,int layer) const {
+ if(isBusy(layer,false))return false;const auto info=sliceInfo(layer);if(info.count<1)return false;
+ juce::MidiMessageSequence sequence;auto tempo=juce::MidiMessage::tempoMetaEvent(500000);tempo.setTimeStamp(0);sequence.addEvent(tempo);
+ for(int i=0;i<info.count;++i){auto on=juce::MidiMessage::noteOn(1,60+i,juce::uint8(100));auto off=juce::MidiMessage::noteOff(1,60+i);const double begin=info.edges[size_t(i)]*info.seconds*960,end=info.edges[size_t(i+1)]*info.seconds*960;on.setTimeStamp(begin);off.setTimeStamp(begin+(end-begin)*.9);sequence.addEvent(on);sequence.addEvent(off);}
+ sequence.updateMatchedPairs();juce::MidiFile midi;midi.setTicksPerQuarterNote(480);midi.addTrack(sequence);auto output=file.createOutputStream();if(!output||!output->setPosition(0)||output->truncate().failed())return false;return midi.writeTo(*output);
+}
 void GBoyProcessor::loadVocalPreset(int preset){
  auto tree=defaults.createCopy();auto set=[&](int layer,const std::string& suffix,float value){auto node=tree.getChildWithProperty("id",juce::String(gboy::parameterId(layer,suffix)));if(node.isValid())node.setProperty("value",value,nullptr);};
  const int count=preset==3?3:1;
