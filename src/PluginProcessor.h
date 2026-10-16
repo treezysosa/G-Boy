@@ -23,7 +23,7 @@ public:
  void getStateInformation(juce::MemoryBlock&) override;
  void setStateInformation(const void*,int) override;
  struct SliceInfo { std::array<double,33> edges{};int count=0;double seconds=0; };
- bool isBusy(int layer) const;
+ bool isBusy(int layer,bool includePublication=true) const;
  SliceInfo sliceInfo(int layer) const;
  bool exportSlices(const juce::File&,int layer) const;
  void loadVocalPreset(int);

@@ -60,9 +60,9 @@ gboy::vocal::Settings GBoyProcessor::vocalSettings(size_t layer) const {
  if(std::abs(settings.pitch)<.0001f)settings.pitch=0;if(std::abs(settings.stretch-1)<.0001f)settings.stretch=1;if(std::abs(settings.formant)<.0001f)settings.formant=0;
  settings.preserve=h.preserve->load()>.5f;settings.reverse=h.reverse->load()>.5f;settings.slicing=juce::jlimit(0,3,int(h.slicing->load()));settings.effect=juce::jlimit(0,3,int(h.effect->load()));return settings;
 }
-bool GBoyProcessor::isBusy(int layer) const {
+bool GBoyProcessor::isBusy(int layer,bool includePublication) const {
  if(layer<0||layer>3)return false;const auto index=size_t(layer);const auto desired=vocalSettings(index);std::lock_guard lock(mutex);const auto& slot=slots[index];
- return slot.hasRequest||slot.rendering||slot.sourceDirty||slot.pending.load()!=nullptr||!(desired==slot.applied);
+ return slot.hasRequest||slot.rendering||slot.sourceDirty||(includePublication&&slot.pending.load()!=nullptr)||!(desired==slot.applied);
 }
 GBoyProcessor::SliceInfo GBoyProcessor::sliceInfo(int layer) const {std::lock_guard lock(mutex);return slots[size_t(juce::jlimit(0,3,layer))].info;}
 void GBoyProcessor::loadLoop(){
@@ -168,7 +168,7 @@ void GBoyProcessor::loadHybridPreset(int preset){
 }
 
 bool GBoyProcessor::exportSlices(const juce::File& file,int layer) const {
- if(isBusy(layer))return false;const auto info=sliceInfo(layer);if(info.count<1)return false;
+ if(isBusy(layer,false))return false;const auto info=sliceInfo(layer);if(info.count<1)return false;
  juce::MidiMessageSequence sequence;auto tempo=juce::MidiMessage::tempoMetaEvent(500000);tempo.setTimeStamp(0);sequence.addEvent(tempo);
  for(int i=0;i<info.count;++i){auto on=juce::MidiMessage::noteOn(1,60+i,juce::uint8(100));auto off=juce::MidiMessage::noteOff(1,60+i);const double begin=info.edges[size_t(i)]*info.seconds*960,end=info.edges[size_t(i+1)]*info.seconds*960;on.setTimeStamp(begin);off.setTimeStamp(begin+(end-begin)*.9);sequence.addEvent(on);sequence.addEvent(off);}
  sequence.updateMatchedPairs();juce::MidiFile midi;midi.setTicksPerQuarterNote(480);midi.addTrack(sequence);auto output=file.createOutputStream();if(!output||!output->setPosition(0)||output->truncate().failed())return false;return midi.writeTo(*output);

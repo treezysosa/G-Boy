@@ -38,7 +38,11 @@ int main(){
  set(*p,gboy::parameterId(0,"enabled"),0);set(*p,gboy::parameterId(3,"enabled"),1);midi.addEvent(juce::MidiMessage::noteOn(1,60,.8f),0);p->processBlock(buffer,midi);require(buffer.getMagnitude(0,256)>0,"imported layer sample plays");
  for(int preset=0;preset<4;++preset){p->loadHybridPreset(preset);settle(*p);midi.addEvent(juce::MidiMessage::noteOn(1,60,.8f),0);p->processBlock(buffer,midi);require(buffer.getMagnitude(0,256)>0,"hybrid factory preset audible");}
  // Vocal render controls, immutable publication, slice export, and recall.
- p->loadVocalPreset(2);settle(*p);require(p->sliceInfo(0).count==8,"vocal preset has eight slice keys");
+ p->loadVocalPreset(2);
+ // A stopped host may not call processBlock. Export must still work once the worker is done.
+ for(int n=0;n<3000&&p->isBusy(0,false);++n)std::this_thread::sleep_for(std::chrono::milliseconds(10));
+ juce::TemporaryFile stoppedMidi(".mid");require(p->exportSlices(stoppedMidi.getFile(),0),"MIDI export while audio processing is stopped");
+ settle(*p);require(p->sliceInfo(0).count==8,"vocal preset has eight slice keys");
  require(p->status(0)=="SYNTHETIC VOWEL PHRASE","synthetic source is accurately labelled");
  set(*p,gboy::parameterId(0,"vPitch"),5);set(*p,gboy::parameterId(0,"vStretch"),1.5f);set(*p,gboy::parameterId(0,"vFormant"),-3);settle(*p);
  require(std::abs(p->sliceInfo(0).seconds-4.8)<.002,"worker renders duration independently");
