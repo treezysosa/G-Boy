@@ -66,7 +66,12 @@ Phase 4 remains a development build. Interactive GUI/DAW behavior, listening qua
 - GCC 14.2 C++20 analysis tests pass with `-Wall -Wextra -Werror -Wpedantic` at 44.1, 48, 96 and 192 kHz. Tests verify A3 pitch/root estimates, trim bounds, RMS/peak, silence/empty input, onset/120-BPM suggestions, similarity identity and audible finite output from all ten hybrid recipes.
 - Analysis ASan/UBSan checks pass with `ASAN_OPTIONS=detect_leaks=0`; leak detection remains unavailable under tracing. Existing hybrid and allocation suites also pass locally after integration.
 - The content generator compiles with warnings as errors and generates all twelve factory samples plus prior demos. The folder-pack manifest names actual generated files with CC0 provenance; six new sounds are original two-layer hybrid renders.
-- New native `library_manager` tests cover Unicode WAV copying, pitch analysis, all-term search, favorites, metadata persistence, missing/relocated folders, pack export/install, duplicate/traversal rejection, preview isolation, sample asset/root project recall and portable sample+patch dependencies. Native CI results are pending.
+- New native `library_manager` tests cover Unicode WAV copying, pitch analysis, all-term search, favorites, metadata persistence, missing/relocated folders, pack export/install, duplicate/traversal rejection, preview isolation, sample asset/root project recall, portable sample+patch dependencies, repeated patch-save overwrite and offline-preview cancellation. [GitHub run 38926652429](https://github.com/treezysosa/G-Boy/actions/runs/38926652429) built Windows VST3/standalone and macOS VST3/AU/standalone. All **9/9 suites passed on each platform**: `audio_core`, `hybrid_core`, `realtime_allocations`, `vocal_core`, `effects_core`, `library_analysis`, `sequencer_core`, `plugin_processor`, and `library_manager`. Factory generation and artifact upload passed on both.
+
+Built source commit: `48c9a6c7cfa27c0d784a821a4864eae4aad4861d`.
+
+- [Windows Phase 5 VST3 + standalone](https://github.com/treezysosa/G-Boy/actions/runs/38926652429/artifacts/12057232159)
+- [macOS Phase 5 VST3 + AU + standalone](https://github.com/treezysosa/G-Boy/actions/runs/38926652429/artifacts/12057471626)
 
 The browser/index workflow is separate from the audio callback. Native GUI interaction, DAW compatibility, filesystem races under rapid edits, cross-process index coordination, real-world analysis quality, long-library CPU budgets, whole-callback realtime guarantees, signing and installers remain unverified. See [Phase 5](PHASE5.md) for precise storage, manifest, workflow and feature limits.
 
