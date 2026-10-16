@@ -1,6 +1,6 @@
 # G Boy — Phase 3 (0.3.0)
 
-A C++20 sample instrument with a JUCE 8 interface. Source foundation, not a validated production release. Windows VST3/Standalone and macOS VST3/AU/Standalone targets are configured. Phase 1 compiled and passed its tests on GitHub Windows and macOS runners. Phase 2 hybrid builds also passed on both runners. Phase 3 adds the vocal workflow described below; see docs/VALIDATION.md for current build status.
+A C++20 sample instrument with a JUCE 8 interface. Source foundation, not a validated production release. Windows VST3/Standalone and macOS VST3/AU/Standalone targets are configured. Phase 1 compiled and passed its tests on GitHub Windows and macOS runners. Phase 2 hybrid builds also passed on both runners. Phase 3 also built successfully on Windows and macOS, with all five test suites passing on each. See docs/VALIDATION.md for download links and the scope of validation.
 
 Implemented: 64-voice stereo sampler, linear interpolation, MIDI note-on/off and channel-aware release, oldest-voice stealing, ADSR, smoothed master gain, soft output limiting, four original generated sounds, on-screen keyboard, hold-to-preview A button, B panic, sample drag/drop and asynchronous decoding, factory selector, save/load `.gboy` presets and host project state, resizable handheld-style GUI, waveform and output meter, modern/retro palettes. Parameters are exposed to DAW automation. Imported samples use MIDI 60 as root. WAV/AIFF/FLAC support comes from JUCE's basic format readers.
 

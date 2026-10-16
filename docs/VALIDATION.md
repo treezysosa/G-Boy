@@ -28,6 +28,24 @@ Built source commit: `2ce46e5e7dd63079f224c6d0162fb7ec0c881ada`.
 
 These are development artifacts, not signed installers. Interactive GUI, DAW compatibility, actual audio devices and Intel/universal macOS deployment remain unverified. Parameter recall was tested using tight floating-point tolerances, since normalized range conversion can introduce rounding. The engine itself is allocation-tested; the full host callback has not been instrumented.
 
+## Phase 3 local verification
+
+- The new `vocal_core` suite passes with GCC C++20 and warnings treated as errors.
+- FFT roundtrip and pitch/time independence are tested at 44.1, 48, 96 and 192 kHz. Pitch octaves change frequency without changing length; 1.6x duration retains the source tone frequency.
+- Spectral-envelope peak measurements verify formant movement and preservation compensation, in addition to waveform-difference checks.
+- Reverse, telephone/lo-fi/stutter effects, grid/onset slicing, distinct slice keys/ends, silence, very short signals and cancellation pass.
+- Existing sampler and hybrid regressions pass. The allocation suite passes across all six playback generators, including Vocal.
+- Vocal AddressSanitizer/UBSan tests pass with leak checking disabled for the traced workspace.
+- Factory generation produces a 3.2-second original synthetic vowel phrase and a 4-second processed Phase 3 demo. Both are stereo 44.1 kHz PCM WAV files with provenance metadata.
+- The native integration suite now tests rendered vocal duration, state reconstruction, source labelling, slice MIDI parsing, stopped-audio export and vocal preset audibility. [GitHub run 38914202728](https://github.com/treezysosa/G-Boy/actions/runs/38914202728) successfully built the Windows VST3/standalone and macOS VST3/AU/standalone targets. All **5/5 test suites passed on each platform**: `audio_core`, `hybrid_core`, `realtime_allocations`, `vocal_core`, and `plugin_processor`. Factory generation and artifact upload also passed.
+
+Built source commit: `08bf8d7042c8afe526184c1ad96c796dcfe24dc7`.
+
+- [Windows Phase 3 build](https://github.com/treezysosa/G-Boy/actions/runs/38914202728/artifacts/12052222034)
+- [macOS Phase 3 build](https://github.com/treezysosa/G-Boy/actions/runs/38914202728/artifacts/12052575532)
+
+Phase 3 is a development build. Pitch/time/formant edits are worker-rendered, not sample-accurate live processors. Whole-phrase MIDI and layer tuning resample audio. Native GUI interaction, DAWs, external audio devices, human-recording quality, Intel/universal macOS deployment and signing remain unverified. Spectral-envelope tests establish implemented behavior, not commercial-quality vocal processing.
+
 ## Remaining checks and development
 
 1. Run pluginval and interactive DAW tests: notes on multiple channels, import and automation during playback, rapid sample changes, project recall and offline export.
@@ -35,4 +53,4 @@ These are development artifacts, not signed installers. Interactive GUI, DAW com
 3. Add sample-change crossfades, smooth generator/filter/enable changes and envelope-time edits, and listen under extreme automation. FM is not oversampled and can alias at high notes/indices.
 4. Add root-note controls, sustain pedal, looping and key zones; validate sample relocation and missing-file recovery workflows.
 5. Review the GUI at multiple DPI settings and window sizes, test devices and accessibility, and prepare signed installers after validation.
-6. Phase 3 adds vocal chopping, dedicated pitch/time/formant processing and slice-to-MIDI. Granular synthesis alone is not a vocal workstation.
+6. Phase 4 adds the modular effects rack, sequencer, arpeggiator and broader MIDI workflow. Phase 3 vocal processing is offline and still needs listening/DAW tests on actual licensed recordings.
