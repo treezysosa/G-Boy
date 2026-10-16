@@ -97,7 +97,7 @@ void GBoyProcessor::loadLoop(){
  std::array<gboy::vocal::Settings,4> observed{};
  std::array<std::chrono::steady_clock::time_point,4> changed{};
  while(!quit.load()){
-  delete previewRetired.exchange(nullptr);juce::String previewId;uint64_t generation=0;{std::lock_guard lock(mutex);previewId=std::move(previewRequest);previewRequest.clear();generation=previewGeneration;}
+  delete previewRetired.exchange(nullptr);juce::String previewId;uint64_t generation=0;{std::lock_guard lock(mutex);previewId=std::move(previewRequest);previewRequest.clear();generation=previewRequestGeneration;}
   if(previewId.isNotEmpty())buildPreview(previewId,generation);
   for(size_t layer=0;layer<slots.size()&&!quit.load();++layer){
    auto& slot=slots[layer];delete slot.retired.exchange(nullptr);
@@ -297,7 +297,7 @@ bool GBoyProcessor::loadLibraryEntry(const juce::String& id,int layer){
  copyXmlToBinary(*xml,block);setStateInformation(block.getData(),int(block.getSize()));return true;
 }
 bool GBoyProcessor::saveLibraryPatch(juce::File file){juce::MemoryBlock block;getStateInformation(block);file=file.withFileExtension("gboy");if(!file.replaceWithData(block.getData(),block.getSize()))return false;library.importFiles({file});return true;}
-void GBoyProcessor::previewLibraryEntry(const juce::String& id){std::lock_guard lock(mutex);previewRequest=id;++previewGeneration;previewBusy.store(true);previewStop.store(true);}
+void GBoyProcessor::previewLibraryEntry(const juce::String& id){std::lock_guard lock(mutex);previewRequest=id;previewRequestGeneration=++previewGeneration;previewBusy.store(true);previewStop.store(true);}
 void GBoyProcessor::stopLibraryPreview(){std::lock_guard lock(mutex);previewRequest.clear();++previewGeneration;delete previewPending.exchange(nullptr);previewStop.store(true);previewBusy.store(false);}
 void GBoyProcessor::buildPreview(const juce::String& id,uint64_t generation){
  try{const auto entry=library.find(id);if(entry.id.isEmpty())throw std::runtime_error("No preview entry");auto sample=std::make_unique<gboy::Sample>();
@@ -316,6 +316,7 @@ void GBoyProcessor::buildPreview(const juce::String& id,uint64_t generation){
  }catch(...){std::lock_guard lock(mutex);if(generation==previewGeneration)previewBusy.store(false);}
 }
 void GBoyProcessor::mixPreview(juce::AudioBuffer<float>& buffer){
+ if(isNonRealtime()){++previewGeneration;previewBusy.store(false);previewEngine.allOff();if(previewRetired.load()==nullptr)if(auto* canceled=previewPending.exchange(nullptr))previewRetired.store(canceled);return;}
  if(previewStop.exchange(false))previewEngine.allOff();if(previewRetired.load()==nullptr)if(auto* next=previewPending.exchange(nullptr)){auto* old=previewActive;previewActive=next;previewEngine.setSample(next);previewRetired.store(old);previewEngine.params.volume=.8f;previewEngine.params.attack=.003f;previewEngine.params.release=.04f;previewEngine.params.sustain=1;previewEngine.noteOn(next->root,1);}
  std::array<float,256> left{},right{};for(int offset=0;offset<buffer.getNumSamples();offset+=256){const int count=std::min(256,buffer.getNumSamples()-offset);previewEngine.render(left.data(),right.data(),count);for(int i=0;i<count;++i){buffer.addSample(0,offset+i,left[size_t(i)]);buffer.addSample(1,offset+i,right[size_t(i)]);}}
 }

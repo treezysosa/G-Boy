@@ -61,6 +61,15 @@ Built source commit: `59cee1e5f1e64603980cbeb0e523b294d5a6d5b2`.
 
 Phase 4 remains a development build. Interactive GUI/DAW behavior, listening quality, CPU budgets, whole-callback realtime properties, signing and Intel/universal macOS deployment remain unverified. Convolution uses a generated sparse 64-tap response; imported long IRs, external audio sidechain, MIDI drag-export and realtime MIDI output are not implemented. Nonlinear processing is not oversampled. See [Phase 4 contract](PHASE4.md) for the precise feature scope.
 
+## Phase 5 verification
+
+- GCC 14.2 C++20 analysis tests pass with `-Wall -Wextra -Werror -Wpedantic` at 44.1, 48, 96 and 192 kHz. Tests verify A3 pitch/root estimates, trim bounds, RMS/peak, silence/empty input, onset/120-BPM suggestions, similarity identity and audible finite output from all ten hybrid recipes.
+- Analysis ASan/UBSan checks pass with `ASAN_OPTIONS=detect_leaks=0`; leak detection remains unavailable under tracing. Existing hybrid and allocation suites also pass locally after integration.
+- The content generator compiles with warnings as errors and generates all twelve factory samples plus prior demos. The folder-pack manifest names actual generated files with CC0 provenance; six new sounds are original two-layer hybrid renders.
+- New native `library_manager` tests cover Unicode WAV copying, pitch analysis, all-term search, favorites, metadata persistence, missing/relocated folders, pack export/install, duplicate/traversal rejection, preview isolation, sample asset/root project recall and portable sample+patch dependencies. Native CI results are pending.
+
+The browser/index workflow is separate from the audio callback. Native GUI interaction, DAW compatibility, filesystem races under rapid edits, cross-process index coordination, real-world analysis quality, long-library CPU budgets, whole-callback realtime guarantees, signing and installers remain unverified. See [Phase 5](PHASE5.md) for precise storage, manifest, workflow and feature limits.
+
 ## Remaining checks and development
 
 1. Run pluginval and interactive DAW tests: notes on multiple channels, import and automation during playback, rapid sample changes, project recall and offline export.
@@ -68,4 +77,4 @@ Phase 4 remains a development build. Interactive GUI/DAW behavior, listening qua
 3. Add sample-change crossfades, smooth generator/filter/enable changes and envelope-time edits, and listen under extreme automation. FM is not oversampled and can alias at high notes/indices.
 4. Add root-note controls, sustain pedal, looping and key zones; validate sample relocation and missing-file recovery workflows.
 5. Review the GUI at multiple DPI settings and window sizes, test devices and accessibility, and prepare signed installers after validation.
-6. Phase 5 expands the searchable library/browser, tagging, installation/relocation and factory content. Phase 3 vocal processing remains offline and needs listening/DAW tests on actual licensed recordings.
+6. Phase 6 focuses on plugin validation, performance/DAW tests, installers, signing and release packaging. Phase 3 vocal processing remains offline and needs listening/DAW tests on actual licensed recordings.

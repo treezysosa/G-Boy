@@ -55,7 +55,7 @@ private:
  gboy::HybridEngine engine;
  gboy::Engine previewEngine;gboy::Sample* previewActive=nullptr;
  std::atomic<gboy::Sample*> previewPending{nullptr},previewRetired{nullptr};
- std::atomic<bool> previewStop{false};juce::String previewRequest;uint64_t previewGeneration=0;
+ std::atomic<bool> previewStop{false};juce::String previewRequest;std::atomic<uint64_t> previewGeneration{0};uint64_t previewRequestGeneration=0;
  void buildPreview(const juce::String&,uint64_t);void mixPreview(juce::AudioBuffer<float>&);
  struct SampleSlot {
   gboy::Sample* active=nullptr;
