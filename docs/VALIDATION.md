@@ -46,6 +46,21 @@ Built source commit: `08bf8d7042c8afe526184c1ad96c796dcfe24dc7`.
 
 Phase 3 is a development build. Pitch/time/formant edits are worker-rendered, not sample-accurate live processors. Whole-phrase MIDI and layer tuning resample audio. Native GUI interaction, DAWs, external audio devices, human-recording quality, Intel/universal macOS deployment and signing remain unverified. Spectral-envelope tests establish implemented behavior, not commercial-quality vocal processing.
 
+## Phase 4 verification
+
+- Local GCC C++20 builds pass the effects and sequencer suites with warnings treated as errors. ASan/UBSan checks pass for both cores with leak checking disabled in the traced workspace.
+- All 27 effect choices (Off plus 26 effects) produce finite bounded output at 44.1, 48, 96 and 192 kHz. Dedicated tests cover exact Off/bypass, delay impulse timing, limiter ceiling, zero-width mono and sparse convolution tails.
+- Scheduler checks cover timing, gate releases, swing, probability, ratchets, scales, arps/octaves/chords, latch, chaining, stop and seek.
+- Allocation instrumentation covers all 20 active effect slots across every type and fixed-capacity chord scheduling; zero heap allocations were observed in these engine paths. This does not certify the full JUCE/DAW callback.
+- JUCE integration covers rack save/load/order, sequenced audio without MIDI, MIDI-file note/release pairing, full FX/pattern state recall, legacy neutral defaults and simulated host PPQ/stop. The clock uses the rate passed to preparation; direct processor preparation does not depend on the wrapper populating JUCE's base sample-rate field.
+- [GitHub run 38921725091](https://github.com/treezysosa/G-Boy/actions/runs/38921725091) compiled Windows VST3 and standalone successfully. All **7/7 test suites passed** on Windows: audio, hybrid, realtime allocations, vocal, effects, sequencer and processor integration. Factory audio generation and artifact upload passed. macOS is queued as of this documentation update.
+
+Built source commit: `59cee1e5f1e64603980cbeb0e523b294d5a6d5b2`.
+
+[Download Windows Phase 4 VST3 + standalone](https://github.com/treezysosa/G-Boy/actions/runs/38921725091/artifacts/12055376800). The package includes generated factory audio. macOS results and any eventual artifact appear on the linked workflow run.
+
+Phase 4 remains a development build. Interactive GUI/DAW behavior, listening quality, CPU budgets, whole-callback realtime properties, signing and Intel/universal macOS deployment remain unverified. Convolution uses a generated sparse 64-tap response; imported long IRs, external audio sidechain, MIDI drag-export and realtime MIDI output are not implemented. Nonlinear processing is not oversampled. See [Phase 4 contract](PHASE4.md) for the precise feature scope.
+
 ## Remaining checks and development
 
 1. Run pluginval and interactive DAW tests: notes on multiple channels, import and automation during playback, rapid sample changes, project recall and offline export.
@@ -53,4 +68,4 @@ Phase 3 is a development build. Pitch/time/formant edits are worker-rendered, no
 3. Add sample-change crossfades, smooth generator/filter/enable changes and envelope-time edits, and listen under extreme automation. FM is not oversampled and can alias at high notes/indices.
 4. Add root-note controls, sustain pedal, looping and key zones; validate sample relocation and missing-file recovery workflows.
 5. Review the GUI at multiple DPI settings and window sizes, test devices and accessibility, and prepare signed installers after validation.
-6. Phase 4 adds the modular effects rack, sequencer, arpeggiator and broader MIDI workflow. Phase 3 vocal processing is offline and still needs listening/DAW tests on actual licensed recordings.
+6. Phase 5 expands the searchable library/browser, tagging, installation/relocation and factory content. Phase 3 vocal processing remains offline and needs listening/DAW tests on actual licensed recordings.
