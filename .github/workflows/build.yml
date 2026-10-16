@@ -2,10 +2,24 @@ name: Release candidate validation
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: gboy-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  diagnose-au:
+    if: startsWith(github.event.head_commit.message, 'Diagnose')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: treezysosa/G-Boy
+          run-id: 38937886152
+          name: G-Boy-validation-macOS
+          path: evidence
+      - name: Show prior AU diagnostic
+        run: cat evidence/auval.log
   sanitizers:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -29,6 +43,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Restore native build cache
+        id: native-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build
+          key: gboy-native-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('CMakeLists.txt', 'src/**', 'tests/*.cpp', 'tests/fixtures/**') }}
+
       - name: Configure Windows
         if: runner.os == 'Windows'
         run: cmake -S . -B build
@@ -37,6 +58,12 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release '-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64' -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
       - name: Compile
         run: cmake --build build --config Release --parallel 4
+      - name: Save compiled build cache
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
       - name: Tests and release reliability
         run: ctest --test-dir build -C Release --output-on-failure --output-junit validation/ctest.xml
       - name: Generate content, native presets and benchmarks

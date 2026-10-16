@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Pinned external validation; record commands, tool hash, logs and real exit status."""
-import argparse, hashlib, json, os, stat, subprocess, sys, urllib.request, zipfile
+import argparse, hashlib, json, os, stat, subprocess, sys, urllib.request, zipfile, time
 from pathlib import Path
 
 def run(command, log, timeout=900):
@@ -8,11 +8,14 @@ def run(command, log, timeout=900):
     with log.open('w',encoding='utf-8') as output:
         try: result=subprocess.run(command,stdout=output,stderr=subprocess.STDOUT,timeout=timeout);code=result.returncode
         except subprocess.TimeoutExpired: code=124
+    if code!=0: print(log.read_text(encoding='utf-8',errors='replace')[-24000:])
     return {'command':list(map(str,command)), 'exit_code':code,'passed':code==0,'log':log.name}
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--platform',choices=['windows','macos'],required=True);p.add_argument('--plugin',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--au',action='store_true');args=p.parse_args();args.output.mkdir(parents=True,exist_ok=True)
     if args.au:
+        subprocess.run(['/usr/bin/killall','AudioComponentRegistrar'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        time.sleep(2)
         result=run(['/usr/bin/auval','-v','aumu','Gb01','Gboy'],args.output/'auval.log')
         (args.output/'auval.json').write_text(json.dumps(result,indent=2));return 0 if result['passed'] else 1
     tool=args.output/'pluginval-tool';tool.mkdir(exist_ok=True)
