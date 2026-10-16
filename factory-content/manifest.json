@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 3,
   "samples": [
     {
       "name": "Chip Pulse",
@@ -40,6 +40,16 @@
       "root_midi": 60,
       "sample_rate": 44100,
       "category": "RETRO GAME"
+    },
+    {
+      "name": "Synthetic Vowel Phrase",
+      "file": "samples/Synthetic Vowel Phrase.wav",
+      "source": "Original harmonic/formant synthesis: src/vocals/VocalRenderer.h syntheticPhrase()",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "root_midi": 60,
+      "sample_rate": 44100,
+      "category": "SYNTHETIC VOCAL"
     }
   ],
   "renders": [
@@ -58,6 +68,14 @@
       "human_performance": false,
       "license": "CC0-1.0",
       "sample_rate": 48000
+    },
+    {
+      "name": "Phase 3 demo",
+      "file": "Phase3-Demo.wav",
+      "source": "Original synthetic vowel phrase, phase-vocoder/formant processing: tools/GenerateContent.cpp",
+      "human_performance": false,
+      "license": "CC0-1.0",
+      "sample_rate": 44100
     }
   ]
 }

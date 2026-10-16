@@ -1,9 +1,27 @@
-# G Boy — Phase 2 (0.2.0)
+# G Boy — Phase 3 (0.3.0)
 
-A C++20 sample instrument with a JUCE 8 interface. Source foundation, not a validated production release. Windows VST3/Standalone and macOS VST3/AU/Standalone targets are configured. Phase 1 compiled and passed its tests on GitHub Windows and macOS runners. Phase 2 adds the hybrid engine described below; see docs/VALIDATION.md for its build status.
+A C++20 sample instrument with a JUCE 8 interface. Source foundation, not a validated production release. Windows VST3/Standalone and macOS VST3/AU/Standalone targets are configured. Phase 1 compiled and passed its tests on GitHub Windows and macOS runners. Phase 2 hybrid builds also passed on both runners. Phase 3 adds the vocal workflow described below; see docs/VALIDATION.md for current build status.
 
 Implemented: 64-voice stereo sampler, linear interpolation, MIDI note-on/off and channel-aware release, oldest-voice stealing, ADSR, smoothed master gain, soft output limiting, four original generated sounds, on-screen keyboard, hold-to-preview A button, B panic, sample drag/drop and asynchronous decoding, factory selector, save/load `.gboy` presets and host project state, resizable handheld-style GUI, waveform and output meter, modern/retro palettes. Parameters are exposed to DAW automation. Imported samples use MIDI 60 as root. WAV/AIFF/FLAC support comes from JUCE's basic format readers.
 
+
+## Phase 3 vocal workstation
+
+Select **VOCALS** to edit the selected layer. IMPORT accepts your original or licensed WAV/AIFF/FLAC recording. **SYNTHETIC VOWEL SOURCE** loads an original generated vowel phrase, explicitly labelled as synthetic. Choose the **Vocal** generator for slice keys, or use Sampler/Granular to play the processed buffer in their normal modes.
+
+- **Pitch:** ±12 semitones, rendered independently of duration.
+- **Duration ratio:** 0.5–2.0, rendered independently of pitch. This is a phase-vocoder algorithm, not a speed-only resampler.
+- **Formant:** ±12 semitones of cepstral spectral-envelope movement. Preserve formants compensates for the *rendered pitch control*. It is approximate, with audible artifacts possible; it does not clone a voice.
+- **Reverse:** reverses the rendered phrase. Changes always start from the cached original, never from a previously processed result.
+- **Chops:** whole phrase, 8/16 equal slices, or energy-onset detection (up to 32). Slice markers and MIDI note numbers appear on the waveform; slices map from MIDI 60 upward and retain their base pitch. Layer tuning and bend can transpose them. Whole-phrase key tracking and layer tuning use conventional resampling, so live MIDI transposition still changes duration/formants; preservation applies to the offline pitch edit.
+- **Effects:** clean, telephone band filtering/saturation, lo-fi sample hold/quantization, and stutter at a fixed 120 BPM. These are rendered effects, not the future general-purpose FX rack.
+- **EXPORT SLICE MIDI:** writes a standard `.mid` sequence at 120 BPM using detected/rendered slice timing. Import the file into a DAW MIDI track routed to G Boy. Realtime MIDI output and drag-export are not implemented.
+
+Vocal controls are stored in plugin/preset state and exposed to the host. They debounce for 150ms and render on the worker, so they are **offline edits, not sample-accurate live automation**. Wait for RENDERING / LOADING to finish before playing or bouncing the new version. The previous buffer stays playable meanwhile. Publishing a render stops that layer's voices and can click. Imports are limited to 30 seconds at 8–192 kHz; stretching can double the buffer length. High-rate, four-layer patches can require hundreds of MB of memory; one worker bounds concurrent render work.
+
+The vocal menu provides Pixel Chops, Reverse Aura, Radio Cuts and Vowel Harmony, using only synthetic vowel content. SAVE/LOAD recalls all layers and reconstructs processed buffers from their source files. Keep external recordings at their saved paths. Older presets migrate with neutral vocal settings. Slices are automatic; manual boundary editing, phase-locked stereo/transient preservation, tempo-synced chopping, real-time formant-preserving MIDI retuning, and human vocal libraries remain future work.
+
+Listen to `factory-content/Phase3-Demo.wav` for a rendered example. See [Phase 3 implementation](docs/PHASE3.md) and [validation](docs/VALIDATION.md).
 
 ## Phase 2 hybrid instrument
 
@@ -85,6 +103,6 @@ Presets store all four layers, their matrix routes, and absolute user sample pat
 
 ## Validation and scope
 
-See [validation](docs/VALIDATION.md) for actual test results and remaining checks. Later phases (vocal workstation, full FX rack, sequencer, searchable libraries) are not implemented or displayed as working controls. MIDI 2.0, sustain pedal, looping, streaming, root detection, custom root selection, CLAP, AAX, GPU rendering, undo, MIDI learn, installers and release signing are not included. Pro Tools support needs AAX and its licensed SDK; VST3 does not provide native Pro Tools support.
+See [validation](docs/VALIDATION.md) for actual test results and remaining checks. Later phases (full FX rack, sequencer, searchable libraries) are not implemented or displayed as working controls. MIDI 2.0, sustain pedal, looping, streaming, root detection, custom root selection, CLAP, AAX, GPU rendering, undo, MIDI learn, installers and release signing are not included. Pro Tools support needs AAX and its licensed SDK; VST3 does not provide native Pro Tools support.
 
 Before distribution, review JUCE's AGPLv3/commercial licensing requirements. Repository source is MIT; generated factory content is CC0-1.0. No Nintendo assets, game recordings or human vocal recordings are included.

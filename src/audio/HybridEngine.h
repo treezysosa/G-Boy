@@ -5,7 +5,7 @@
 #include "../effects/StateVariableFilter.h"
 #include "../modulation/Matrix.h"
 namespace gboy {
-enum class Generator { Sample,Analog,Wavetable,FM,Granular };
+enum class Generator { Sample,Analog,Wavetable,FM,Granular,Vocal };
 struct LayerParameters {
  bool enabled=true;Generator generator=Generator::Sample;
  float attack=.01f,decay=.15f,sustain=.7f,release=.25f;
@@ -18,6 +18,7 @@ class LayerEngine {
  struct Voice {
   double pos=0,phase=0,modPhase=0,frequency=440,increment=.01,step=1;
   float env=0,velocity=0,releaseStep=0,pan=0,level=1,shape=.5f,position=.2f,cutoff=18000,leftPan=.70710678f,rightPan=.70710678f;
+  double begin=0,end=0;bool sliced=false;
   int note=60,channel=1,stage=0,control=0;uint64_t age=0;
   Grains grains;std::array<StateVariableFilter,2> filter;
  };
@@ -31,7 +32,7 @@ class LayerEngine {
   const float semitones=std::clamp(params.tune+mods[0]*12+bends[size_t(v.channel-1)]*2,-60.f,60.f);
   const double frequency=440*std::exp2((v.note-69+double(semitones))/12);
   const double targetIncrement=std::clamp(frequency/rate,0.000001,.45);
-  const double targetStep=sample?sample->rate/rate*std::exp2((v.note-sample->root+double(semitones))/12):1;
+  const double targetStep=sample?sample->rate/rate*std::exp2(((v.sliced?0:v.note-sample->root)+double(semitones))/12):1;
   // Control updates every 16 samples; a 5ms smoother limits automation discontinuities.
   v.increment+=(targetIncrement-v.increment)*smoothing;v.step+=(targetStep-v.step)*smoothing;
   v.pan+=(std::clamp(params.pan+mods[3],-1.f,1.f)-v.pan)*smoothing;
@@ -53,13 +54,16 @@ public:
  int activeVoices() const {int n=0;for(const auto& v:voices)n+=v.stage!=0;return n;}
  void noteOn(int note,float velocity,int channel=1){
   if(!params.enabled||channel<1||channel>16)return;
-  if((params.generator==Generator::Sample||params.generator==Generator::Granular)&&(!sample||sample->left.size()<2||sample->left.size()!=sample->right.size()))return;
+  if((params.generator==Generator::Sample||params.generator==Generator::Granular||params.generator==Generator::Vocal)&&(!sample||sample->left.size()<2||sample->left.size()!=sample->right.size()))return;
+  if(params.generator==Generator::Vocal&&sample->sliceCount>0&&(note<60||note>=60+sample->sliceCount))return;
   if(lastGenerator!=params.generator){reset();}
   auto* selected=&voices[0];
   for(auto& v:voices){if(v.stage==0){selected=&v;break;}if(v.age<selected->age)selected=&v;}
   *selected={};auto& v=*selected;v.note=std::clamp(note,0,127);v.channel=channel;v.velocity=std::clamp(velocity,0.f,1.f);v.stage=1;v.age=++age;
+  v.end=sample?double(sample->left.size()):0;
+  if(params.generator==Generator::Vocal&&sample->sliceCount>0){const size_t index=size_t(note-60);v.begin=double(sample->sliceEdges[index]);v.end=double(sample->sliceEdges[index+1]);v.pos=v.begin;v.sliced=true;}
   v.frequency=440*std::exp2((v.note-69+double(params.tune))/12);v.increment=std::clamp(v.frequency/rate,.000001,.45);
-  v.step=sample?sample->rate/rate*std::exp2((v.note-sample->root+double(params.tune))/12):1;
+  v.step=sample?sample->rate/rate*std::exp2(((v.sliced?0:v.note-sample->root)+double(params.tune))/12):1;
   v.pan=params.pan;v.cutoff=params.cutoff;v.shape=params.shape;v.position=params.position;
  }
  void noteOff(int note,int channel=1){for(auto& v:voices)if(v.stage&&v.note==note&&v.channel==channel&&v.stage!=4){v.stage=4;v.releaseStep=v.env/(std::max(.001f,params.release)*float(rate));}}
@@ -81,9 +85,12 @@ public:
     if(v.control--<=0){control(v,lfo);v.control=15;}
     float x=0,y=0;
     switch(params.generator){
+     case Generator::Vocal:
      case Generator::Sample:
-      if(!sample||v.pos+1>=double(sample->left.size())){v.stage=0;continue;}
-      x=sampleAt(sample->left,v.pos);y=sampleAt(sample->right,v.pos);v.pos+=v.step;break;
+      if(!sample||v.pos+1>=v.end){v.stage=0;continue;}
+      x=sampleAt(sample->left,v.pos);y=sampleAt(sample->right,v.pos);
+      if(v.sliced){const double fade=std::max(1.,std::min(sample->rate*.003,(v.end-v.begin)*.25));const float edge=float(std::clamp(std::min((v.pos-v.begin)/fade,(v.end-1-v.pos)/fade),0.,1.));x*=edge;y*=edge;}
+      v.pos+=v.step;break;
      case Generator::Analog:x=y=analog(v.phase,v.increment,v.shape);break;
      case Generator::Wavetable:x=y=tables?tables->read(v.phase,v.increment,v.shape):0;break;
      case Generator::FM:{

@@ -1,0 +1,11 @@
+{
+  "name": "Radio Cuts",
+  "category": "SYNTHETIC VOCAL",
+  "author": "G Boy Audio",
+  "license": "CC0-1.0",
+  "source": "vocal:0",
+  "human_performance": false,
+  "factory_function": "GBoyProcessor::loadVocalPreset",
+  "factory_index": 2,
+  "note": "Factory metadata. Select this named preset from the Vocal presets menu; user preset files use .gboy."
+}

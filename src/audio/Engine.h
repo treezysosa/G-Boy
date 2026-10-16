@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cstdint>
 namespace gboy {
-struct Sample { std::vector<float> left, right; double rate=44100; int root=60; };
+struct Sample { std::vector<float> left, right; double rate=44100; int root=60; std::array<size_t,33> sliceEdges{}; int sliceCount=0; };
 struct Parameters { float attack=.01f, decay=.15f, sustain=.7f, release=.25f, volume=.65f; };
 class Engine {
  struct Voice { double pos=0, step=1; float env=0, velocity=0, releaseStep=0; int note=-1, channel=1, stage=0; uint64_t age=0; };

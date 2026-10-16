@@ -14,6 +14,15 @@ private:
  juce::MidiKeyboardComponent keys;
  std::array<juce::Slider,15> knobs;std::array<juce::Label,15> labels;
  std::array<std::unique_ptr<SliderAttachment>,15> attachments;
+ std::array<juce::Slider,3> vocalKnobs;std::array<juce::Label,3> vocalLabels;
+ std::array<std::unique_ptr<SliderAttachment>,3> vocalAttachments;
+ juce::ToggleButton preserve{"Preserve formants when pitching"},reverse{"Reverse phrase"};
+ std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> preserveAttachment,reverseAttachment;
+ juce::ComboBox sliceMode,vocalEffect,vocalPatches;
+ juce::Label sliceLabel,effectLabel,vocalHelp;
+ std::unique_ptr<ComboAttachment> sliceAttachment,effectAttachment;
+ juce::TextButton synthetic{"SYNTHETIC VOWEL SOURCE"},midiExport{"EXPORT SLICE MIDI"},hybridPage{"HYBRID"},vocalPage{"VOCALS"};
+ bool showVocals=false;void setPage(bool);
  juce::Slider master;juce::Label masterLabel;std::unique_ptr<SliderAttachment> masterAttachment;
  std::array<juce::TextButton,4> layerButtons;
  juce::ToggleButton enabled{"Layer enabled"};

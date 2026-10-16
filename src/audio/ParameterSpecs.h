@@ -12,6 +12,9 @@ inline constexpr std::array<ParameterSpec,15> layerSpecs{{
  {"position","Grain position",0,1,.2f,1},{"grainSize","Grain size (s)",.01f,.25f,.08f,.5f},
  {"lfoRate","LFO rate (Hz)",.01f,30,2,.4f},{"macro","Macro",0,1,0,1}
 }};
+inline constexpr std::array<ParameterSpec,3> vocalSpecs{{
+ {"vPitch","Pitch (st)",-12,12,0,1},{"vStretch","Duration ratio",.5f,2,1,1},{"vFormant","Formant (st)",-12,12,0,1}
+}};
 inline std::string parameterId(int layer,const std::string& suffix){
  if(layer==0&&(suffix=="attack"||suffix=="decay"||suffix=="sustain"||suffix=="release"))return suffix;
  return "l"+std::to_string(layer+1)+"_"+suffix;

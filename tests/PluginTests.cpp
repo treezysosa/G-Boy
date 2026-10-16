@@ -6,7 +6,7 @@ void require(bool value,const char* message){if(!value)throw std::runtime_error(
 void set(GBoyProcessor& p,const std::string& id,float value){auto* param=p.state.getParameter(id);require(param!=nullptr,"parameter exists");param->setValueNotifyingHost(param->convertTo0to1(value));}
 void settle(GBoyProcessor& p){
  juce::AudioBuffer<float> buffer(2,128);juce::MidiBuffer midi;
- for(int n=0;n<500;++n){p.processBlock(buffer,midi);bool loading=false;for(int i=0;i<4;++i)loading|=p.status(i)=="LOADING...";if(!loading)return;std::this_thread::sleep_for(std::chrono::milliseconds(10));}
+ for(int n=0;n<3000;++n){p.processBlock(buffer,midi);bool loading=false;for(int i=0;i<4;++i)loading|=p.isBusy(i);if(!loading)return;std::this_thread::sleep_for(std::chrono::milliseconds(10));}
  throw std::runtime_error("sample loader timeout");
 }
 int main(){
@@ -37,6 +37,15 @@ int main(){
  const auto layer1Status=p->status(0);p->requestSample(temporary.getFile().getFullPathName(),3);settle(*p);require(p->status(0)==layer1Status,"import isolated from layer 1");require(p->status(3)==temporary.getFile().getFileName(),"real WAV decoded");
  set(*p,gboy::parameterId(0,"enabled"),0);set(*p,gboy::parameterId(3,"enabled"),1);midi.addEvent(juce::MidiMessage::noteOn(1,60,.8f),0);p->processBlock(buffer,midi);require(buffer.getMagnitude(0,256)>0,"imported layer sample plays");
  for(int preset=0;preset<4;++preset){p->loadHybridPreset(preset);settle(*p);midi.addEvent(juce::MidiMessage::noteOn(1,60,.8f),0);p->processBlock(buffer,midi);require(buffer.getMagnitude(0,256)>0,"hybrid factory preset audible");}
+ // Vocal render controls, immutable publication, slice export, and recall.
+ p->loadVocalPreset(2);settle(*p);require(p->sliceInfo(0).count==8,"vocal preset has eight slice keys");
+ require(p->status(0)=="SYNTHETIC VOWEL PHRASE","synthetic source is accurately labelled");
+ set(*p,gboy::parameterId(0,"vPitch"),5);set(*p,gboy::parameterId(0,"vStretch"),1.5f);set(*p,gboy::parameterId(0,"vFormant"),-3);settle(*p);
+ require(std::abs(p->sliceInfo(0).seconds-4.8)<.002,"worker renders duration independently");
+ juce::TemporaryFile midiFile(".mid");require(p->exportSlices(midiFile.getFile(),0),"export slice MIDI");auto midiInput=midiFile.getFile().createInputStream();juce::MidiFile parsed;require(midiInput&&parsed.readFrom(*midiInput),"parse exported MIDI");require(parsed.getNumTracks()==1&&parsed.getTimeFormat()==480,"standard MIDI timing");int noteOns=0;for(int i=0;i<parsed.getTrack(0)->getNumEvents();++i)noteOns+=parsed.getTrack(0)->getEventPointer(i)->message.isNoteOn();require(noteOns==8,"exported MIDI notes correspond to slices");
+ juce::MemoryBlock vocalState;p->getStateInformation(vocalState);p->loadHybridPreset(0);settle(*p);p->setStateInformation(vocalState.getData(),int(vocalState.getSize()));settle(*p);require(p->sliceInfo(0).count==8&&std::abs(p->sliceInfo(0).seconds-4.8)<.002,"vocal rendering reconstructs after recall");
+ midi.addEvent(juce::MidiMessage::noteOn(1,61,.8f),0);p->processBlock(buffer,midi);require(buffer.getMagnitude(0,256)>0,"rendered vocal slice responds to MIDI");
+ for(int preset:{0,1,3}){p->loadVocalPreset(preset);settle(*p);midi.addEvent(juce::MidiMessage::noteOn(1,60,.8f),0);p->processBlock(buffer,midi);double peak=buffer.getMagnitude(0,256);for(int n=0;n<100&&peak==0;++n){p->processBlock(buffer,midi);peak=std::max(peak,double(buffer.getMagnitude(0,256)));}require(peak>0,"vocal preset audible");}
  p->setStateInformation("invalid",7);p->setStateInformation(nullptr,0);
- std::cout<<"PASS processor: layer/matrix recall, sample-offset MIDI, wheel/bend, Phase 1 migration, missing sample\n";
+ std::cout<<"PASS processor: layer/matrix recall, sample-offset MIDI, wheel/bend, Phase 1 migration, missing sample, vocal render/recall, MIDI export, vocal presets\n";
 }

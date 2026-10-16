@@ -1,5 +1,6 @@
 #include "audio/Engine.h"
 #include "audio/HybridEngine.h"
+#include "vocals/VocalRenderer.h"
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -18,5 +19,9 @@ int main(int argc,char** argv){auto dest=std::filesystem::path(argc>1?argv[1]:"f
  hybrid.render(l.data(),r.data(),48000);
  for(int note:{60,64,67}){hybrid.noteOff(note);}
  hybrid.render(l.data()+48000,r.data()+48000,96000);wav(dest/"../Phase2-Demo.wav",l,r,48000);
+
+ auto phrase=gboy::vocal::syntheticPhrase();wav(dest/"Synthetic Vowel Phrase.wav",phrase.left,phrase.right,44100);
+ gboy::vocal::Settings vocal;vocal.pitch=4;vocal.stretch=1.25f;vocal.formant=-2;vocal.slicing=1;vocal.effect=1;
+ auto processed=gboy::vocal::render(phrase,vocal);wav(dest/"../Phase3-Demo.wav",processed.left,processed.right,44100);
 
 }
