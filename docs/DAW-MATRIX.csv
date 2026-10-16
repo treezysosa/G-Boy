@@ -1,0 +1,11 @@
+platform,architecture,host,host_version,format,scan,notes_and_automation,save_recall,offline_export,multi_instance,long_session,reviewer,date,notes
+Windows,x64,FL Studio,,VST3,not-run,not-run,not-run,not-run,not-run,not-run,,,
+Windows,x64,Ableton Live,,VST3,not-run,not-run,not-run,not-run,not-run,not-run,,,
+Windows,x64,Cubase,,VST3,not-run,not-run,not-run,not-run,not-run,not-run,,,
+Windows,x64,Reaper,,VST3,not-run,not-run,not-run,not-run,not-run,not-run,,,
+Windows,x64,Studio One,,VST3,not-run,not-run,not-run,not-run,not-run,not-run,,,
+Windows,x64,Bitwig,,VST3,not-run,not-run,not-run,not-run,not-run,not-run,,,
+macOS,arm64,Logic Pro,,AU,not-run,not-run,not-run,not-run,not-run,not-run,,,
+macOS,arm64,Ableton Live,,VST3,not-run,not-run,not-run,not-run,not-run,not-run,,,
+macOS,arm64,Reaper,,VST3,not-run,not-run,not-run,not-run,not-run,not-run,,,
+macOS,x86_64,Reaper,,VST3,not-run,not-run,not-run,not-run,not-run,not-run,,,

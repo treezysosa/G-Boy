@@ -27,6 +27,8 @@ def main():
     binary=next(tool.rglob('pluginval.exe')) if args.platform=='windows' else next(tool.rglob('pluginval.app'))/'Contents/MacOS/pluginval'
     if args.platform=='macos': binary.chmod(binary.stat().st_mode|stat.S_IXUSR|stat.S_IXGRP|stat.S_IXOTH)
     command=[str(binary.resolve()),'--validate-in-process','--strictness-level','5','--timeout-ms','120000','--output-dir',str(args.output.resolve()),str(args.plugin.resolve())]
-    result=run(command,args.output/'pluginval-console.log');result.update(version='1.0.4',strictness=5,download=url,archive_sha256=hashlib.sha256(data).hexdigest())
+    result=run(command,args.output/'pluginval-console.log');
+    if args.platform=='macos': result['tool_architecture']=subprocess.check_output(['/usr/bin/file',str(binary)],text=True).strip()
+    result.update(version='1.0.4',strictness=5,download=url,archive_sha256=hashlib.sha256(data).hexdigest())
     (args.output/'pluginval.json').write_text(json.dumps(result,indent=2));print(json.dumps(result));return 0 if result['passed'] else 1
 if __name__=='__main__':sys.exit(main())

@@ -1,9 +1,13 @@
-# G Boy — Phase 5 (0.5.0)
+# G Boy — 0.6.0 Release Candidate 1
 
-A C++20 hybrid sample instrument with JUCE 8.0.6. Version 0.5.0 builds Windows VST3/Standalone and macOS VST3/AU/Standalone. All nine test suites passed on both GitHub runners. This is a development build; interactive DAW validation, signing and installers remain outstanding. See [validation](docs/VALIDATION.md) for downloads and exact verification scope.
+C++20/JUCE hybrid instrument, sampler and offline vocal workstation. Phase 6 adds release-candidate installers, universal macOS builds, state migration, callback monitoring, native reliability tests, external validation and source/license packaging. See [release engineering](docs/RELEASE.md) for installation, reproducible builds, signing commands and the remaining production gates. Native Phase 6 CI results are being verified.
 
 Implemented: 64-voice stereo sampler, linear interpolation, MIDI note-on/off and channel-aware release, oldest-voice stealing, ADSR, smoothed master gain, soft output limiting, four original generated sounds, on-screen keyboard, hold-to-preview A button, B panic, sample drag/drop and asynchronous decoding, factory selector, save/load `.gboy` presets and host project state, resizable handheld-style GUI, waveform and output meter, modern/retro palettes. Parameters are exposed to DAW automation. Direct imports use MIDI 60 as root; browser loads apply editable analysed/declared root metadata. WAV/AIFF/FLAC support comes from JUCE's basic format readers.
 
+
+## Phase 6 release candidate
+
+Windows x64 uses VST3/standalone; macOS universal uses VST3/AU/standalone. The release pipeline generates installers, portable archives, checksums, benchmarks, GUI snapshots and corresponding source. It runs pluginval strictness 5 and macOS auval and exercises installer payloads. Fourteen real native factory patches with audio previews expand the installable factory pack to 26 assets. Artifacts remain unsigned; actual DAW certification is a separate, explicitly recorded gate.
 
 ## Phase 5 library and browser
 
